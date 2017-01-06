@@ -1,0 +1,16 @@
+Contrast Subtraction: TO-DO Log:
+
+	Create progress bars for the registration and subtraction.
+	
+	Change volume rendering options to be more realistic out of the box.
+
+	Explore different methods of defining a region of interest - particularly one that doesn't involve a solely cubic ROI.
+
+	Add a "Reset" button to the final step.
+
+	Ensure that steps do not break if progressed forwards/backwards.
+
+	Create batch functionality
+		Find ways to auto-estimate the necessary threshold.
+		Understand how Slicer stores regions of interest, so that users may upload their own.
+		See if there is a way for Slicer to output progress to Terminal.

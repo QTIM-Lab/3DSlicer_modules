@@ -1,0 +1,211 @@
+ExtraCode
+
+baselineNode = slicer.util.getNode('MRBrainTumor1')
+followupNode = slicer.util.getNode('MRBrainTumor2')
+
+baselineImage = baselineNode.GetImageData()
+followupImage = followupNode.GetImageData()
+
+imageArray = [baselineImage, followupImage]
+b = slicer.util.array('MRBrainTumor1')
+d = slicer.util.array('MRBrainTumor2')
+stdArray = [0,0]
+maxArray = [0,0]
+vtkScaleArray = [vtk.vtkImageShiftScale(), vtk.vtkImageShiftScale()]
+vtkStatsArray = [vtk.vtkImageHistogramStatistics(), vtk.vtkImageHistogramStatistics()]
+print vtkScaleArray
+
+for i in [0,1]:
+	vtkStatsArray[i].SetInputData(imageArray[i])
+	vtkStatsArray[i].Update()
+	maxArray[i] = vtkStatsArray[i].GetMaximum()
+	stdArray[i] = vtkStatsArray[i].GetStandardDeviation()
+	print maxArray
+	print stdArray
+
+
+PreMax = maxArray.index(max(maxArray))
+
+for i in [0,1]:
+	vtkScaleArray[i].SetInputData(imageArray[i])
+	vtkScaleArray[i].SetOutputScalarTypeToInt()
+	scalar = float(stdArray[PreMax]) / float(stdArray[i])
+	vtkScaleArray[i].SetScale(scalar)
+	vtkScaleArray[i].Update()
+	imageArray[i] = vtkScaleArray[i].GetOutput()
+
+print imageArray
+
+slicer.util.getNode('MRBrainTumor1_1').SetAndObserveImageData(imageArray[0])
+a = slicer.util.array('MRBrainTumor1_1')
+slicer.util.getNode('MRBrainTumor2_1').SetAndObserveImageData(imageArray[1])
+c = slicer.util.array('MRBrainTumor2_1')
+print a[100,190,:]
+print b[100,190,:]
+print c[100,190,:]
+print d[100,190,:]
+
+imageArray[0]
+slicer.util.getNode('MRBrainTumor1_1').GetImageData().GetScalarTypeAsString()
+
+for i in [0,1]:
+	vtkStats.SetInputData(imageArray[i])
+	vtkStats.Update()
+	maxArray[i] = vtkStats.GetMaximum()
+	stdArray[i] = vtkStats.GetStandardDeviation()
+	vtkScale.SetInputData(imageArray[i])
+	vtkScale.Update()
+	vtkScale.SetOutputScalarTypeToFloat()
+	vtkScale.SetScale(1 / stdArray[i])
+	stdImageArray[i] = vtkScale.GetOutput()
+	print maxArray[i]
+	
+
+for i in [0,1]:
+	vtkStats.SetInputData(stdImageArray[i])
+	vtkStats.Update()
+	stdMaxArray[i] = vtkStats.GetMaximum()
+	print stdArray[i]
+
+
+PreMax = max(maxArray)
+PostMax = max(stdMaxArray)
+
+
+for i in [0,1]:
+	vtkScale.SetInputData(stdImageArray[i])
+	vtkScale.Update()
+	vtkScale.SetOutputScalarTypeToInt()
+	vtkScale.SetScale(PreMax / PostMax)
+	normImageArray[i] = vtkScale.GetOutput()
+
+
+# self.chartOptions = ("Count", "Volume mm^3", "Volume cc", "Min", "Max", "Mean", "StdDev")
+
+        # self.chartFrame = qt.QFrame()
+        # self.chartFrame.setLayout(qt.QHBoxLayout())
+        # self.__layout.addWidget(self.chartFrame)
+        # self.chartButton = qt.QPushButton("Chart")
+        # self.chartButton.toolTip = "Make a chart from the current statistics."
+        # self.chartFrame.layout().addWidget(self.chartButton)
+        # self.chartOption = qt.QComboBox()
+        # self.chartOption.addItems(self.chartOptions)
+        # self.chartFrame.layout().addWidget(self.chartOption)
+        # self.chartIgnoreZero = qt.QCheckBox()
+        # self.chartIgnoreZero.setText('Ignore Zero')
+        # self.chartIgnoreZero.checked = False
+        # self.chartIgnoreZero.setToolTip('Do not include the zero index in the chart to avoid dwarfing other bars')
+        # self.chartFrame.layout().addWidget(self.chartIgnoreZero)
+        # self.chartFrame.enabled = False
+
+	# baselineNode = slicer.util.getNode(baselineLabel)
+		# followupNode = slicer.util.getNode(followupLabel)
+		# print baselineNode
+
+		# baselineImage = baselineNode.GetImageData()
+		# followupImage = followupNode.GetImageData()
+
+		# imageArray = [baselineImage, followupImage]
+		# stdArray = [0,0]
+		# maxArray = [0,0]
+		# stdMaxArray = [0,0]
+		# stdImageArray = [vtk.vtkImageData(),vtk.vtkImageData()]
+		# normImageArray = [vtk.vtkImageData(),vtk.vtkImageData()]
+
+		# vtkScale = vtk.vtkImageShiftScale()
+		# vtkScale.SetOutputScalarTypeToFloat()
+		# vtkStats = vtk.vtkImageHistogramStatistics()
+
+		# for i in [0,1]:
+		# 	vtkStats.SetInputData(imageArray[i])
+		# 	vtkStats.Update()
+		# 	maxArray[i] = vtkStats.GetMaximum()
+		# 	stdArray[i] = vtkStats.GetStandardDeviation()
+		# 	vtkScale.SetInputData(imageArray[i])
+		# 	vtkScale.Update()
+		# 	vtkScale.SetOutputScalarTypeToFloat()
+		# 	vtkScale.SetScale(1 / stdArray[i])
+		# 	stdImageArray[i] = vtkScale.GetOutput()
+		# 	vtkStats.SetInputData(stdImageArray[i])
+		# 	vtkStats.Update()
+		# 	stdMaxArray[i] = vtkStats.GetMaximum()
+		# 	print maxArray[i]
+		# 	print stdMaxArray[i]
+
+		# PreMax = max(maxArray)
+		# PostMax = max(stdMaxArray)
+
+		# for i in [0,1]:
+		# 	vtkScale.SetInputData(stdImageArray[i])
+		# 	vtkScale.Update()
+		# 	vtkScale.OutputScalarTypeToInt()
+		# 	vtkScale.SetScale(PreMax / PostMax)
+		# 	normImageArray[i] = vtkScale.GetOutput()
+
+		# # baselineArray = slicer.util.array(baselineLabel)
+		# # followupArray = slicer.util.array(followupLabel)
+		# # print baselineArray[100,190,:]
+		# # print baselineArray.dtype
+
+		# # MaxIntensity = max(baselineArray.max(), followupArray.max())
+		# # print MaxIntensity
+
+		# # MinIntensity = min(baselineArray.min(), followupArray.min())
+		# # print MinIntensity
+
+		# if MinIntensity < 0:
+		# 	print "Negative Values!"
+
+		# baselineMultiplier = 0.5
+		# vtkMultiply.setInput1Data(baselineNode.GetImageData())
+		# vtkMultiply.setConstantK(baselineMultiplier)
+
+		# baselineArray = baselineArray / baselineArray.std()
+		# followupArray = followupArray / followupArray.std()
+		# print baselineArray[100,190,:]
+
+		# MaxRelativeIntensity = max(baselineArray.max(), followupArray.max())
+
+		# baselineArray = baselineArray * (MaxIntensity / MaxRelativeIntensity) / 2
+		# followupArray = followupArray * (MaxIntensity / MaxRelativeIntensity) / 2
+		# print baselineArray[100,190,:]
+
+		# baselineArray = np.around(baselineArray)
+		# followupArray = np.around(followupArray)
+		# print baselineArray[100,190,:]
+		# print baselineArray.dtype
+
+		# # baselineArray = baselineArray - 300
+
+		# baselineArray = baselineArray.astype('int16')
+		# followupArray = followupArray.astype('int16')
+		# print baselineArray.dtype
+		# print baselineArray[100,190,:]
+
+		# ijkToRAS = vtk.vtkMatrix4x4()
+		# baselineNode.GetIJKToRASMatrix(ijkToRAS)
+		# print 'Coordinates Received'
+
+		# VTK_baseline = numpy_support.numpy_to_vtk(num_array=baselineArray.ravel(), deep=True, array_type=vtk.VTK_INT)
+		# VTK_followup = numpy_support.numpy_to_vtk(num_array=baselineArray.ravel(), deep=True, array_type=vtk.VTK_INT)
+
+		# baselineNode.SetAndObserveImageData(VTK_baseline)
+		# followupNode.SetAndObserveImageData(VTK_followup)
+		# # baselineNode.Modified()
+		# # followupNode.GetImageData().Modified()
+
+		# baselineArray = slicer.util.array(baselineLabel)
+		# print baselineArray[100,190,:]
+
+Traceback (most recent call last):
+  File "C:/Users/Abeers/Desktop/slicer4minute/BeersStepExample/QTIM-T1-Subtraction-Map\BeersStepWizard\ROIandSubtract.py", line 104, in onROIChanged
+    roi.SetAndObserveTransformNodeID(self.__roiTransformNode.GetID())
+AttributeError: 'NoneType' object has no attribute 'GetID'
+Traceback (most recent call last):
+  File "C:/Users/Abeers/Desktop/slicer4minute/BeersStepExample/QTIM-T1-Subtraction-Map\BeersStepWizard\ROIandSubtract.py", line 220, in onEntry
+    self.updateWidgetFromParameterNode(pNode)
+  File "C:/Users/Abeers/Desktop/slicer4minute/BeersStepExample/QTIM-T1-Subtraction-Map\BeersStepWizard\ROIandSubtract.py", line 262, in updateWidgetFromParameterNode
+    self.onROIChanged()
+  File "C:/Users/Abeers/Desktop/slicer4minute/BeersStepExample/QTIM-T1-Subtraction-Map\BeersStepWizard\ROIandSubtract.py", line 104, in onROIChanged
+    roi.SetAndObserveTransformNodeID(self.__roiTransformNode.GetID())
+AttributeError: 'NoneType' object has no attribute 'GetID'
