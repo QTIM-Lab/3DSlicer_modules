@@ -1,7 +1,7 @@
 """ Meant to be imported by ModelSegmentation.py. Conveniently loads all other files in the folder and tells the user in console.
 """
 
-from BeersSingleStep import *
+from ModelSegmentationStep import *
 from VolumeSelect import *
 from Registration import *
 from NormalizeSubtract import *

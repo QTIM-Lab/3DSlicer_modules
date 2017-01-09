@@ -13,16 +13,16 @@
 
 from __main__ import qt, ctk, slicer
 
-from BeersSingleStep import *
+from ModelSegmentationStep import *
 from Helper import *
 import PythonQt
 
-""" ROIStep inherits from BeersSingleStep, with itself inherits
+""" ROIStep inherits from ModelSegmentationStep, with itself inherits
 	from a ctk workflow class. PythonQT is required for this step
 	in order to get the ROI selector widget.
 """
 
-class ROIStep( BeersSingleStep ) :
+class ROIStep( ModelSegmentationStep ) :
 
 	def __init__( self, stepid ):
 
