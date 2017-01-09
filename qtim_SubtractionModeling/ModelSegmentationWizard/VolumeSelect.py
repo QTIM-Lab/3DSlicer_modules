@@ -1,19 +1,21 @@
-""" This is Step 1. The user selects the pre- and if preferred post-contrast volumes 
+""" This is Step 1. The user selects the pre- and, if preferred, post-contrast volumes 
 	from which to construct a threshold ROI. TO-DO: Load test-case data.
 """
 
 from __main__ import qt, ctk, slicer
 
-from BeersSingleStep import *
+from ModelSegmentationStep import *
 from Helper import *
+
+# Not sure why Editor libaries are being loaded in this step.h
 from Editor import EditorWidget
 from EditorLib import EditorLib
 
-""" VolumeSelectStep inherits from BeersSingleStep, with itself inherits
+""" VolumeSelectStep inherits from ModelSegmentationStep, with itself inherits
 	from a ctk workflow class. 
 """
 
-class VolumeSelectStep(BeersSingleStep) :
+class VolumeSelectStep(ModelSegmentationStep) :
 
 	def __init__(self, stepid):
 
@@ -47,7 +49,7 @@ class VolumeSelectStep(BeersSingleStep) :
 		self.__primaryGroupBoxLayout = qt.QFormLayout(self.__primaryGroupBox)
 
 		self.__subtractionMappingGroupBox = qt.QGroupBox()
-		self.__subtractionMappingGroupBox.setTitle('Subtraction Mapping')
+		self.__subtractionMappingGroupBox.setTitle('Volume Selection')
 		self.__subtractionMappingGroupBoxLayout = qt.QFormLayout(self.__subtractionMappingGroupBox)
 
 		baselineScanLabel = qt.QLabel( 'Primary / Pre-Contrast Image:' )
@@ -85,11 +87,12 @@ class VolumeSelectStep(BeersSingleStep) :
 		qt.QTimer.singleShot(0, self.killButton)
 
 	def setSubtractionMapping(self):
+		# Links check box to the "greying out" of the followup volume selection.
 		self.__followupVolumeSelector.enabled = self.__enableSubtractionMapping.checked
 
 	def validate( self, desiredBranchId ):
 
-		# Validate is called whenever goes to a different step
+		# Validate is called whenever one goes to a different step
 		self.__parent.validate( desiredBranchId )
 
 		# Check here that the selectors are not empty / the same
@@ -160,11 +163,13 @@ class VolumeSelectStep(BeersSingleStep) :
 		pNode.SetParameter('currentStep', self.stepid)
 
 		# A different attempt to get rid of the extra workflow button.
+		# Unsure why this line has to happen twice.. Should run some
+		# experiments to find out.
 		qt.QTimer.singleShot(0, self.killButton)
 
 	def onExit(self, goingTo, transitionType):   
 
-		super(BeersSingleStep, self).onExit(goingTo, transitionType) 
+		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 
 
 	def updateWidgetFromParameters(self, parameterNode):
 

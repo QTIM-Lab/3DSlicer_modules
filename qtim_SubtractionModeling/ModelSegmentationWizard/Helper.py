@@ -1,6 +1,6 @@
 """ This is a helper file loaded by individual steps in the module. It has
 	been copied from ChangeTracker at https://github.com/fedorov/ChangeTrackerPy.
-	Not all methods are used.
+	Not all methods are necessarily used.
 """
 
 from __main__ import vtk, slicer
@@ -10,10 +10,12 @@ import time
 
 class Helper( object ):
 
+	# I don't have too much experience with decorators in Python, and do not yet
+	# know what this does.
 	@staticmethod
 	def Error( message ):
 
-		print "[ChangeTrackerPy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: ERROR: " + str( message )
+		print "[ModelSegmentation " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "]: ERROR: " + str( message )
 		sys.stdout.flush()
 
 	@staticmethod
@@ -28,7 +30,7 @@ class Helper( object ):
 		showDebugOutput = 0
 		from time import strftime
 		if showDebugOutput:
-			print "[ChangeTrackerPy " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "] DEBUG: " + str( message )
+			print "[ModelSegmentation " + time.strftime( "%m/%d/%Y %H:%M:%S" ) + "] DEBUG: " + str( message )
 			sys.stdout.flush()
 
 	@staticmethod
@@ -61,6 +63,7 @@ class Helper( object ):
 	def SetBgFgVolumes(bg, fg):
 
 		# Used to set Background (Bg) and Foreground (Fg) volumes in the scene.
+		# Uses node IDs, rather than nodes themselves.
 		appLogic = slicer.app.applicationLogic()
 		selectionNode = appLogic.GetSelectionNode()
 		selectionNode.SetReferenceActiveVolumeID(bg)
@@ -71,6 +74,7 @@ class Helper( object ):
 	def SetLabelVolume(lb):
 
 		# Used to create a Label Volume, which can overlay on existing volumes.
+		# Uses node IDs.
 		appLogic = slicer.app.applicationLogic()
 		selectionNode = appLogic.GetSelectionNode()
 		selectionNode.SetReferenceActiveLabelVolumeID(lb)
@@ -79,7 +83,9 @@ class Helper( object ):
 	@staticmethod
 	def InitVRDisplayNode(vrDisplayNode, volumeID, roiID):
 
-		# Takes most of the steps necessary to create a 3D Visualization of an image.
+		# Uses the volume rendering module to initiate 3D visualizations.
+		# NOTE: This code seems to be duplicated several times within individual
+		# steps. It would be best to consolidate them in this code if possible..
 
 		vrLogic = slicer.modules.volumerendering.logic()
 

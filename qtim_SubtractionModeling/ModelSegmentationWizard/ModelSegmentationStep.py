@@ -7,9 +7,11 @@
 """
 
 from __main__ import qt, ctk
+
+# Imports functions for the parameter node.
 from slicer.ScriptedLoadableModule import *
 
-class BeersSingleStep( ctk.ctkWorkflowWidgetStep ) :
+class ModelSegmentationStep( ctk.ctkWorkflowWidgetStep ) :
 
 	def __init__( self, stepid ):
 
@@ -27,7 +29,7 @@ class BeersSingleStep( ctk.ctkWorkflowWidgetStep ) :
 
 	def createUserInterface( self ):
 
-  		# Create base layout for a step.
+  		# Create basic layout for a step.
 		self.__layout = qt.QFormLayout( self )
 		self.__layout.setVerticalSpacing( 5 )
 
@@ -45,18 +47,18 @@ class BeersSingleStep( ctk.ctkWorkflowWidgetStep ) :
 
 		print "-> onEntry - current [%s] - comingFrom [%s]" % ( self.id(), comingFromId )
 
-		super( BeersSingleStep, self ).onEntry( comingFrom, transitionType )
+		super( ModelSegmentationStep, self ).onEntry( comingFrom, transitionType )
 
 	def onExit( self, goingTo, transitionType ):
 
+		# Keeps track of parameters and steps for testing purposes.
 		print self.__parameterNode
 		goingToId = "None"
 		if goingTo: 
 			goingToId = goingTo.id()
-
 		print "-> onExit - current [%s] - goingTo [%s]" % ( self.id(), goingToId )
 
-		super( BeersSingleStep, self ).onExit( goingTo, transitionType )
+		super( ModelSegmentationStep, self ).onExit( goingTo, transitionType )
 
 	def validate( self, desiredBranchId ):
 		
@@ -69,10 +71,10 @@ class BeersSingleStep( ctk.ctkWorkflowWidgetStep ) :
 
 	def validationSucceeded( self, desiredBranchId ):
 
-		super( BeersSingleStep, self ).validate( True, desiredBranchId )
+		super( ModelSegmentationStep, self ).validate( True, desiredBranchId )
 
 	def validationFailed( self, desiredBranchId, messageTitle='Error', messageText='There was an unknown error. See the console output for more details!' ):
 		
 		messageBox = qt.QMessageBox.warning( self, messageTitle, messageText )
-		super( BeersSingleStep, self ).validate( False, desiredBranchId )
+		super( ModelSegmentationStep, self ).validate( False, desiredBranchId )
 

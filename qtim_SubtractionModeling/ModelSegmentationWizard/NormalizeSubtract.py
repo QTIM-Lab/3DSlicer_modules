@@ -5,14 +5,14 @@
 
 from __main__ import qt, ctk, slicer
 
-from BeersSingleStep import *
+from ModelSegmentationStep import *
 from Helper import *
 
-""" NormalizeSubtractStep inherits from BeersSingleStep, with itself inherits
+""" NormalizeSubtractStep inherits from ModelSegmentationStep, with itself inherits
 	from a ctk workflow class. 
 """
 
-class NormalizeSubtractStep( BeersSingleStep ) :
+class NormalizeSubtractStep( ModelSegmentationStep ) :
 
 	def __init__( self, stepid ):
 
@@ -56,6 +56,7 @@ class NormalizeSubtractStep( BeersSingleStep ) :
 		self.__normalizationButton.connect('clicked()', self.onNormalizationRequest)
 		self.__normalizationButton.setEnabled(1)
 
+		# Create new volumes options.
 		self.__OutputRadio1 = qt.QRadioButton("Create new volumes.")
 		self.__OutputRadio1.toolTip = "New volumes will be created with the naming convention \"[vol]_normalized\"."
 		NormGroupBoxLayout.addRow(self.__OutputRadio1)
@@ -115,23 +116,16 @@ class NormalizeSubtractStep( BeersSingleStep ) :
 
 	def onEntry(self, comingFrom, transitionType):
 
-
 		super(NormalizeSubtractStep, self).onEntry(comingFrom, transitionType)
 
 		pNode = self.parameterNode()
 
 		if pNode.GetParameter('followupVolumeID') == None or pNode.GetParameter('followupVolumeID') == '':
-			print 'No FollowupVolume!'
-			print pNode.GetParameter('currentStep')
 			if pNode.GetParameter('currentStep') == 'RegistrationStep':
 				self.workflow().goForward()
 			if pNode.GetParameter('currentStep') == 'ROIStep':
 				self.workflow().goBackward()
 
-		# self.__normalizationButton.setText('Run Gaussian Normalization')
-		# self.__subtractionButton.setText('Run Subtraction Algorithm')
-		# self.__normalizationButton.setEnabled(1)
-		# self.__subtractionButton.setEnabled(1)
 		self.__status = 'uncalled'
 
 		self.__normalizationButton.setEnabled(1)
@@ -147,8 +141,91 @@ class NormalizeSubtractStep( BeersSingleStep ) :
 
 	def onExit(self, goingTo, transitionType):
 
-		super(BeersSingleStep, self).onExit(goingTo, transitionType) 
+		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 
 
+	def onNormalizationRequest(self):
+
+		""" This method uses vtk algorithms to perform simple image calculations. Slicer 
+			images are stored in vtkImageData format, making it difficult to edit them
+			without using vtk. Here, vtkImageShiftScale and vtkImageHistogramStatistics
+			are used to generate max, standard deviation, and simple multiplication. Currently,
+			I create an instance for both baseline and followup; a better understanding
+			of vtk may lead me to consolidate them into one instance later. Sidenote: I don't
+			think this method is very good -- I took it from one paper. Probably better to
+			do histogram-matching. Also the following code is a little crazy and repetitive.
+		"""
+
+		self.__normalizationButton.setEnabled(0)
+		self.__normalizationButton.setText('Normalization running...')
+
+		pNode = self.parameterNode()
+
+		volumesLogic = slicer.modules.volumes.logic()
+
+		baselineVolumeID = pNode.GetParameter('baselineVolumeID')
+		followupVolumeID = pNode.GetParameter('followupVolumeID')
+
+		baselineNode = slicer.mrmlScene.GetNodeByID(baselineLabel)
+		followupNode = slicer.mrmlScene.GetNodeByID(followupLabel)
+
+		baselineName = baselineNode.getName()
+		followupName = followupNode.getName()
+
+		baselineImage = baselineNode.GetImageData()
+		followupImage = followupNode.GetImageData()
+
+		typeArray = ['baseline', 'followup']
+		nodeArray = [baselineNode, followupNode]
+		nameArray = [baselineName, followupName]
+		imageArray = [baselineImage, followupImage]
+		resultArray = ['','']
+		stdArray = [0,0]
+		maxArray = [0,0]
+		vtkScaleArray = [vtk.vtkImageShiftScale(), vtk.vtkImageShiftScale()]
+		vtkStatsArray = [vtk.vtkImageHistogramStatistics(), vtk.vtkImageHistogramStatistics()]
+
+		# Descriptive statistics are retrieved.
+		for i in [0,1]:
+			vtkStatsArray[i].SetInputData(imageArray[i])
+			vtkStatsArray[i].Update()
+			maxArray[i] = vtkStatsArray[i].GetMaximum()
+			stdArray[i] = vtkStatsArray[i].GetStandardDeviation()
+
+		# Values are rescaled to the highest intensity value from both images.
+		CommonMax = maxArray.index(max(maxArray))
+		LowerMaxImage = imageArray[CommonMax]
+
+		# Image scalar multiplication is perfored to normalize the two images.
+		# New volumes are created. With the present mode of normalization, one
+		# of the created volumes will be identical.
+
+		# This method of naming normalized volumes is pretty bad, and should
+		# probably be fixed during project week.
+		for i in [0,1]:
+			vtkScaleArray[i].SetInputData(imageArray[i])
+			vtkScaleArray[i].SetOutputScalarTypeToInt()
+			scalar = float(stdArray[CommonMax]) / float(stdArray[i])
+			vtkScaleArray[i].SetScale(scalar)
+			vtkScaleArray[i].Update()
+			imageArray[i] = vtkScaleArray[i].GetOutput()
+
+			if self.__OutputRadio1.isChecked():
+
+				normalizeID = pNode.GetParameter(nameArray[i] + '_normalized')
+				if normalizeID == None or normalizeID == '':
+					resultArray[i] = volumesLogic.CloneVolumeWithoutImageData(slicer.mrmlScene, nodeArray[i], nameArray[i] + '_normalized')
+				else:
+					resultArray[i] = Helper.getNodeByID(normalizeID)
+				resultArray[i].SetAndObserveImageData(imageArray[i])
+				pNode.SetParameter(typeArray[i] + 'NormalizeVolumeID', resultArray[i].GetID())
+
+			elif self.__OutputRadio2.isChecked():
+				nodeArray[i].SetAndObserveImageData(imageArray[i])
+				pNode.SetParameter(typeArray[i] + 'NormalizeVolumeID', nodeArray[i].GetID())
+
+		Helper.SetBgFgVolumes(pNode.GetParameter('baselineNormalizeVolumeID'), pNode.GetParameter('followupNormalizeVolumeID'))
+
+		self.__normalizationButton.setText('Normalization complete!')
 
 	def onSubtractionRequest(self):
 
@@ -196,7 +273,6 @@ class NormalizeSubtractStep( BeersSingleStep ) :
 		self.__subtractionButton.setText('Subtraction running...')
 		self.__subtractionButton.setEnabled(0)
 
-
 	def processSubtractionCompletion(self, node, event):
 
 		""" This updates the registration button with the CLI module's convenient status
@@ -207,75 +283,3 @@ class NormalizeSubtractStep( BeersSingleStep ) :
 
 		if self.__status == 'Completed':
 			self.__subtractionButton.setText('Subtraction completed!')
-
-	def onNormalizationRequest(self):
-
-		""" This method uses vtk algorithms to perform simple image calculations. Slicer 
-			images are stored in vtkImageData format, making it difficult to edit them
-			without using vtk. Here, vtkImageShiftScale and vtkImageHistogramStatistics
-			are used to generate max, standard deviation, and simple multiplication. Currently,
-			I create an instance for both baseline and followup; a better understanding
-			of vtk may lead me to consolidate them into one instance later.
-		"""
-
-		self.__normalizationButton.setEnabled(0)
-		self.__normalizationButton.setText('Normalization running...')
-
-		pNode = self.parameterNode()
-
-		volumesLogic = slicer.modules.volumes.logic()
-
-		baselineLabel = pNode.GetParameter('baselineVolumeID')
-		followupLabel = pNode.GetParameter('followupVolumeID')
-
-		baselineNode = slicer.mrmlScene.GetNodeByID(baselineLabel)
-		followupNode = slicer.mrmlScene.GetNodeByID(followupLabel)
-
-		baselineImage = baselineNode.GetImageData()
-		followupImage = followupNode.GetImageData()
-
-		nodeArray = [baselineNode, followupNode]
-		imageArray = [baselineImage, followupImage]
-		resultArray = ['','']
-		stdArray = [0,0]
-		maxArray = [0,0]
-		vtkScaleArray = [vtk.vtkImageShiftScale(), vtk.vtkImageShiftScale()]
-		vtkStatsArray = [vtk.vtkImageHistogramStatistics(), vtk.vtkImageHistogramStatistics()]
-
-		# Descriptive statistics are retrieved.
-		for i in [0,1]:
-			vtkStatsArray[i].SetInputData(imageArray[i])
-			vtkStatsArray[i].Update()
-			maxArray[i] = vtkStatsArray[i].GetMaximum()
-			stdArray[i] = vtkStatsArray[i].GetStandardDeviation()
-
-		# Values are rescaled to the highest intensity value from both images.
-		CommonMax = maxArray.index(max(maxArray))
-		LowerMaxImage = imageArray[CommonMax]
-
-		# Image scalar multiplication is perfored to normalize the two images.
-		# New volumes are created. With the present mode of normalization, one
-		# of the created volumes will be identical.
-		for i in [0,1]:
-			vtkScaleArray[i].SetInputData(imageArray[i])
-			vtkScaleArray[i].SetOutputScalarTypeToInt()
-			scalar = float(stdArray[CommonMax]) / float(stdArray[i])
-			vtkScaleArray[i].SetScale(scalar)
-			vtkScaleArray[i].Update()
-			imageArray[i] = vtkScaleArray[i].GetOutput()
-
-			if self.__OutputRadio1.isChecked():
-				normalizeID = pNode.GetParameter('normalizeVolume_' + str(i))
-				if normalizeID == None or normalizeID == '':
-					resultArray[i] = volumesLogic.CloneVolumeWithoutImageData(slicer.mrmlScene, nodeArray[i], nodeArray[i].GetName() + '_normalized')
-				else:
-					resultArray[i] = Helper.getNodeByID(normalizeID)
-				resultArray[i].SetAndObserveImageData(imageArray[i])
-				pNode.SetParameter('normalizeVolume_' + str(i), resultArray[i].GetID())
-			elif self.__OutputRadio2.isChecked():
-				nodeArray[i].SetAndObserveImageData(imageArray[i])
-				pNode.SetParameter('normalizeVolume_' + str(i), nodeArray[i].GetID())
-
-		Helper.SetBgFgVolumes(pNode.GetParameter('normalizeVolume_2'), pNode.GetParameter('normalizeVolume_1'))
-
-		self.__normalizationButton.setText('Normalization complete!')

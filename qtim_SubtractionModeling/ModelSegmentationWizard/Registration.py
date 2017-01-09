@@ -1,18 +1,17 @@
 """ This is Step 2. The user has the option to register their pre- and post-contrast images
-	using the module ExpertAutomatedRegistration. TO-DO: Add an option for BRAINSfit and
-	add a progress bar.
+	using the module BRAINSFit. TO-DO: add a progress bar.
 """
 
 from __main__ import qt, ctk, slicer
 
-from BeersSingleStep import *
+from ModelSegmentationStep import *
 from Helper import *
 
-""" RegistrationStep inherits from BeersSingleStep, with itself inherits
+""" RegistrationStep inherits from ModelSegmentationStep, with itself inherits
 	from a ctk workflow class. 
 """
 
-class RegistrationStep( BeersSingleStep ) :
+class RegistrationStep( ModelSegmentationStep ) :
 	
 	def __init__( self, stepid ):
 
@@ -32,9 +31,10 @@ class RegistrationStep( BeersSingleStep ) :
 	def createUserInterface( self ):
 		
 		""" This method uses qt to create a user interface of radio buttons to select
-		a registration method. Note that BSpline registration is so slow and memory-consuming
-		as to at one point break Slicer. There is an option to run it with limited memory,
-		but this may take prohibitively long.
+			a registration method. Note that BSpline registration is so slow and memory-consuming
+			as to at one point break Slicer. There is an option to run it with limited memory,
+			but this may take prohibitively long. <- NOTE this last comment was based on
+			expert automated registration - not sure about other modules.
 		"""
 
 		self.__layout = self.__parent.createUserInterface()
@@ -172,17 +172,14 @@ class RegistrationStep( BeersSingleStep ) :
 
 	def onExit(self, goingTo, transitionType):
 
-		super(BeersSingleStep, self).onExit(goingTo, transitionType) 
+		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 
 
 	def onRegistrationRequest(self):
 
-		""" This method makes a call to a different Slicer module, Expert Automated
-			Registration. It is a command line interface (CLI) module that comes 
-			pre-packaged with Slicer. It may be useful to develop a check, in case
-			someone is using a version of slicer without this module. Other modules
-			are avaliable too, such as BRAINSfit. Note that this registration method
-			computes a transform, which is then applied to the followup volume in
-			processRegistrationCompletion. TO-DO: Add a cancel button..
+		""" This method makes a call to a different slice module, BRAINSFIT. 
+			Note that this registration method computes a transform, which is 
+			then applied to the followup volume in processRegistrationCompletion. 
+			TO-DO: Add a cancel button and a progress bar
 		"""
 		if self.__RegistrationRadio1.isChecked():
 			return
@@ -191,10 +188,12 @@ class RegistrationStep( BeersSingleStep ) :
 
 			#TO-DO: Find appropriate vtk subclass for non-BSpline transforms.
 			
-			self.__BSplineTransform = slicer.vtkMRMLBSplineTransformNode()
-			self.__LinearTransform = slicer.vtkMRMLLinearTransformNode()
-			slicer.mrmlScene.AddNode(self.__BSplineTransform)
-			slicer.mrmlScene.AddNode(self.__LinearTransform)
+			if self.__RegistrationRadio4.isChecked():
+				self.__BSplineTransform = slicer.vtkMRMLBSplineTransformNode()
+				slicer.mrmlScene.AddNode(self.__BSplineTransform)
+			else:
+				self.__LinearTransform = slicer.vtkMRMLLinearTransformNode()
+				slicer.mrmlScene.AddNode(self.__LinearTransform)
 
 			parameters = {}
 
@@ -215,15 +214,12 @@ class RegistrationStep( BeersSingleStep ) :
 			parameters["samplingPercentage"] = .02
 
 			if self.__RegistrationRadio2.isChecked():
-				# parameters['linearTransform'] = self.__LinearTransform
 				pNode.SetParameter('registrationTransformID', self.__LinearTransform.GetID())
 				parameters['transformType'] = 'Rigid'
 			elif self.__RegistrationRadio3.isChecked():
-				# parameters['linearTransform'] = self.__LinearTransform
 				pNode.SetParameter('registrationTransformID', self.__LinearTransform.GetID())
 				parameters['transformType'] = 'Rigid,ScaleVersor3D,ScaleSkewVersor3D,Affine'
 			elif self.__RegistrationRadio4.isChecked():
-				# parameters['bsplineTransform'] = self.__BSplineTransform
 				pNode.SetParameter('registrationTransformID', self.__BSplineTransform.GetID())
 				parameters['transformType'] = 'BSpline'
 
@@ -278,6 +274,4 @@ class RegistrationStep( BeersSingleStep ) :
 				Helper.SetBgFgVolumes(pNode.GetParameter('followupVolumeID'), pNode.GetParameter('registrationVolumeID'))
 			else:
 				Helper.SetBgFgVolumes(pNode.GetParameter('registrationVolumeID'), pNode.GetParameter('baselineVolumeID'))
-		
-			Helper.SetBgFgVolumes(pNode.GetParameter('registrationVolumeID'), pNode.GetParameter('baselineVolumeID'))
 
