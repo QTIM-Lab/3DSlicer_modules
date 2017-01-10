@@ -4,16 +4,16 @@
 
 from __main__ import qt, ctk, slicer
 
-from BeersSingleStep import *
+from ModelSegmentationStep import *
 from Helper import *
 
 import string
 
-""" ThresholdStep inherits from BeersSingleStep, with itself inherits
+""" ThresholdStep inherits from ModelSegmentationStep, with itself inherits
 	from a ctk workflow class. 
 """
 
-class ThresholdStep( BeersSingleStep ) :
+class ThresholdStep( ModelSegmentationStep ) :
 
 	def __init__( self, stepid ):
 
@@ -32,9 +32,11 @@ class ThresholdStep( BeersSingleStep ) :
 		# Initialize volume rendering.
 		self.__vrLogic = slicer.modules.volumerendering.logic()
 		self.__vrOpacityMap = None
+		self.__vrColorMap = None
 
-		self.__roiSegmentationNode = None
+		self.__roiLabelNode = None
 		self.__roiVolume = None
+		self.__visualizedVolume = None
 
 		self.__parent = super( ThresholdStep, self )
 
@@ -75,21 +77,10 @@ class ThresholdStep( BeersSingleStep ) :
 			updates the volume rendering node and label volume accordingly.
 		"""
 
-		# if self.__vrOpacityMap == None:
-			# return
-		
 		range0 = self.__threshRange.minimumValue
 		range1 = self.__threshRange.maximumValue
 
-		# self.__vrOpacityMap.RemoveAllPoints()
-		# self.__vrOpacityMap.AddPoint(0,0)
-		# self.__vrOpacityMap.AddPoint(0,0)
-		# self.__vrOpacityMap.AddPoint(range0-1,0)
-		# self.__vrOpacityMap.AddPoint(range0,1)
-		# self.__vrOpacityMap.AddPoint(range1,1)
-		# self.__vrOpacityMap.AddPoint(range1+1,0)
-
-		# Use vtk to update the label volume. TO-DO: Investigate these methods further.
+		# Use vtk to threshold the label volume.
 
 		thresh = vtk.vtkImageThreshold()
 		if vtk.VTK_MAJOR_VERSION <= 5:
@@ -103,7 +94,7 @@ class ThresholdStep( BeersSingleStep ) :
 		thresh.ReplaceInOn()
 		thresh.Update()
 
-		self.__roiSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
+		self.__roiLabelNode.SetAndObserveImageData(thresh.GetOutput())
 
 	def killButton(self):
 		# ctk creates a useless final page button. This method gets rid of it.
@@ -123,67 +114,44 @@ class ThresholdStep( BeersSingleStep ) :
 		"""
 
 		super(ThresholdStep, self).onEntry(comingFrom, transitionType)
-		pNode = self.parameterNode()
-		self.updateWidgetFromParameters(pNode)
 
-		if pNode.GetParameter('followupVolumeID') == None or pNode.GetParameter('followupVolumeID') == '':
-			Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'), pNode.GetParameter('croppedVolumeID'))
-			self.__visualizedVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
+		pNode = self.parameterNode()
+
+		# What if someone goes to the Volume Rendering module, creates a new VRNode,
+		# and then returns? Need some way to check if self.__vrNode is currently
+		# being viewed.
+
+		self.__vrDisplayNodeID = pNode.GetParameter('vrDisplayNodeID')
+
+		if self.__vrDisplayNodeID == None or self.__vrDisplayNodeID != '':
+			self.InitVRDisplayNode()
+			self.__vrDisplayNodeID = self.__vrDisplayNode.GetID()
 		else:
-			self.__visualizedVolume = Helper.getNodeByID(pNode.GetParameter('subtractVolumeID'))
-			Helper.SetBgFgVolumes(pNode.GetParameter('subtractVolumeID'),  pNode.GetParameter('croppedVolumeID'))
+			self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(vrDisplayNodeID)
+
+		self.updateWidgetFromParameters(pNode)
 
 		# Retrieves necessary nodes.
 		roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
 		self.__roiVolume = roiVolume
-		self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedVolumeSegmentationID'))
-		self.__modelSegmentationNode = Helper.getNodeByID(pNode.GetParameter('modelSegmentationID'))
-		vrDisplayNodeID = pNode.GetParameter('vrDisplayNodeID')
+		self.__roiLabelNode = Helper.getNodeByID(pNode.GetParameter('croppedVolumeLabelID'))
+		self.__modelSegmentationNode = Helper.getNodeByID(pNode.GetParameter('modelLabelID'))
 
 		self.__roiNodeID = pNode.GetParameter('roiNodeID')
 		if self.__roiNodeID == None:
 			Helper.Error('Failed to find ROI node -- it should have been defined in the previous step!')
 			return
 
-		if self.__vrDisplayNode == None:
-			if vrDisplayNodeID != '':
-				self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(vrDisplayNodeID)
-			if self.__vrDisplayNode == None:
-				self.InitVRDisplayNode()
-				self.__vrDisplayNodeID = self.__vrDisplayNode.GetID()
-		else:
-			Helper.InitVRDisplayNode(self.__vrDisplayNode, roiVolume.GetID(), self.__roiNodeID)	
-
-		# Does work to intialize color and opacity maps
-		self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
-		vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
-		
-		# ROIRange = roiVolume.GetImageData().GetScalarRange()
-
-		# vrColorMap.RemoveAllPoints()
-		# vrColorMap.AddRGBPoint(0, 0, 0, 0) 
-		# vrColorMap.AddRGBPoint(ROIRange[0]-1, 0, 0, 0) 
-		# vrColorMap.AddRGBPoint(ROIRange[0], 0.8, 0.8, 0) 
-		# vrColorMap.AddRGBPoint(ROIRange[1], 0.8, 0.8, 0) 
-		# vrColorMap.AddRGBPoint(ROIRange[1]+1, 0, 0, 0) 
-
-		self.__vrDisplayNode.VisibilityOn()
+		# Not sure why this is here..
+		# self.__vrDisplayNode.VisibilityOn()
 
 		threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
-		# self.__vrOpacityMap.RemoveAllPoints()
-		# self.__vrOpacityMap.AddPoint(0,0)
-		# self.__vrOpacityMap.AddPoint(0,0)
-		# self.__vrOpacityMap.AddPoint(threshRange[0]-1,0)
-		# self.__vrOpacityMap.AddPoint(threshRange[0],1)
-		# self.__vrOpacityMap.AddPoint(threshRange[1],1)
-		# self.__vrOpacityMap.AddPoint(threshRange[1]+1,0)
-
-		# labelsColorNode = slicer.modules.colors.logic().GetColorTableNodeID(10)
-		# self.__roiSegmentationNode.GetDisplayNode().SetAndObserveColorNodeID(labelsColorNode)
 
 		# Adds segementation label volume.
-		Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
+		Helper.SetLabelVolume(self.__roiLabelNode.GetID())
 
+		# Segments the entire vtk model. I assume there's a more concise way
+		# to do it than thresholding over its entire intensity range...
 		range0 = 0
 		range1 = self.__threshRange.maximum
 		thresh = vtk.vtkImageThreshold()
@@ -197,11 +165,6 @@ class ThresholdStep( BeersSingleStep ) :
 		thresh.ReplaceOutOn()
 		thresh.ReplaceInOn()
 		thresh.Update()
-
-		print self.__modelSegmentationNode
-		print 'model printed'
-		print thresh.GetOutput()
-		print 'thresh printed'
 		self.__modelSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
 
 		# Adjusts threshold information.
@@ -211,24 +174,24 @@ class ThresholdStep( BeersSingleStep ) :
 	
 		qt.QTimer.singleShot(0, self.killButton)
 
-	def onExit(self, goingTo, transitionType):   
-		pNode = self.parameterNode()
-		if self.__vrDisplayNode != None:
-			# self.__vrDisplayNode.VisibilityOff()
-			pNode.SetParameter('vrDisplayNodeID', self.__vrDisplayNode.GetID())
-		super(BeersSingleStep, self).onExit(goingTo, transitionType) 
-
 	def updateWidgetFromParameters(self, pNode):
 
 		""" Intializes the threshold and label volume established in the previous step.
 		"""
+
+		if pNode.GetParameter('followupVolumeID') == None or pNode.GetParameter('followupVolumeID') == '':
+			Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'), '')
+			self.__visualizedVolume = Helper.getNodeByID(pNode.GetParameter('baselineVolumeID'))
+		else:
+			Helper.SetBgFgVolumes(pNode.GetParameter('subtractVolumeID'), pNode.GetParameter('followupVolumeID'))
+			self.__visualizedVolume = Helper.getNodeByID(pNode.GetParameter('subtractVolumeID'))
 
 		ROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
 		ROIRange = ROIVolume.GetImageData().GetScalarRange()
 		self.__threshRange.minimum = ROIRange[0]
 		self.__threshRange.maximum = ROIRange[1]
 
-		thresholdRange = pNode.GetParameter('thresholdRange')
+		thresholdRange = [int(pNode.GetParameter('intensityThreshRangeMin')), int(pNode.GetParameter('intensityThreshRangeMax'))]
 		if thresholdRange != '':
 			rangeArray = string.split(thresholdRange, ',')
 			self.__threshRange.minimumValue = float(rangeArray[0])
@@ -236,8 +199,25 @@ class ThresholdStep( BeersSingleStep ) :
 		else:
 			Helper.Error('Unexpected parameter values! Error code CT-S03-TNA. Please report')
 
-		segmentationID = pNode.GetParameter('croppedVolumeSegmentationID')
-		self.__roiSegmentationNode = Helper.getNodeByID(segmentationID)
+		labelID = pNode.GetParameter('croppedVolumeLabelID')
+		self.__roiLabelNode = Helper.getNodeByID(labelID)
+
+		self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
+		self.__vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
+
+	def onExit(self, goingTo, transitionType):   
+		pNode = self.parameterNode()
+		if self.__vrDisplayNode != None:
+			# self.__vrDisplayNode.VisibilityOff()
+			pNode.SetParameter('vrDisplayNodeID', self.__vrDisplayNode.GetID())
+
+		roiRange = self.__threshRange
+		pNode.SetParameter('intensityThreshRangeMin', str(roiRange[0]))
+		pNode.SetParameter('intensityThreshRangeMax', str(roiRange[1]))
+		pNode.SetParameter('vrThreshRangeMin', str(roiRange[0]))
+		pNode.SetParameter('vrThreshRangeMax', str(roiRange[1]))
+
+		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 
 
 	def InitVRDisplayNode(self):
 
@@ -251,9 +231,8 @@ class ThresholdStep( BeersSingleStep ) :
 			# Documentation on UnRegister is scant so far.
 			self.__vrDisplayNode.UnRegister(self.__vrLogic) 
 
-			v = slicer.mrmlScene.GetNodeByID(self.parameterNode().GetParameter('croppedVolumeID'))
-			Helper.InitVRDisplayNode(self.__vrDisplayNode, v.GetID(), '')
-			v.AddAndObserveDisplayNodeID(self.__vrDisplayNode.GetID())
+			Helper.InitVRDisplayNode(self.__vrDisplayNode, self.__visualizedVolume.GetID(), '')
+			self.__visualizedVolume.AddAndObserveDisplayNodeID(self.__vrDisplayNode.GetID())
 
 		# This is a bit messy.
 		viewNode = slicer.util.getNode('vtkMRMLViewNode1')
@@ -267,5 +246,5 @@ class ThresholdStep( BeersSingleStep ) :
 
 		# Renders in yellow, like the label map in the next steps.
 		self.__vrColorMap.RemoveAllPoints()
-		self.__vrColorMap.AddRGBPoint(0, 0.01, 0.01, 0)
-		self.__vrColorMap.AddRGBPoint(500, 0.2, 0.2, 0)
+		self.__vrColorMap.AddRGBPoint(vrRange[0], 0.8, 0.8, 0) 
+		self.__vrColorMap.AddRGBPoint(vrRange[1], 0.8, 0.8, 0) 

@@ -7,18 +7,18 @@
 
 from __main__ import qt, ctk, slicer
 
-from BeersSingleStep import *
+from ModelSegmentationStep import *
 from Helper import *
 from Editor import EditorWidget
 from EditorLib import EditorLib
 
 import string
 
-""" ReviewStep inherits from BeersSingleStep, with itself inherits
+""" ReviewStep inherits from ModelSegmentationStep, with itself inherits
 	from a ctk workflow class. 
 """
 
-class ReviewStep( BeersSingleStep ) :
+class ReviewStep( ModelSegmentationStep ) :
 
 	def __init__( self, stepid ):
 
@@ -30,13 +30,13 @@ class ReviewStep( BeersSingleStep ) :
 		self.initialize( stepid )
 		self.setName( '6. Review' )
 
-		self.__pNode = None
 		self.__vrDisplayNode = None
 		self.__threshold = [ -1, -1 ]
 		
 		# initialize VR stuff
 		self.__vrLogic = slicer.modules.volumerendering.logic()
 		self.__vrOpacityMap = None
+		self.__vrColorMap = None
 
 		self.__roiSegmentationNode = None
 		self.__roiVolume = None
@@ -122,49 +122,69 @@ class ReviewStep( BeersSingleStep ) :
 		self.__layout.addRow(RestartGroupBox)
 
 	def hideUnwantedEditorUIElements(self):
+
+		""" We import the Editor module wholesale, which is useful, but it means
+			we have to manually hide parts we don't want after the fact..
+		"""
+
 		self.__editorWidget.volumes.hide()
+
+		# Useful testing code
 		# for widgetName in slicer.util.findChildren(self.__editorWidget.editBoxFrame):
-		for widgetName in slicer.util.findChildren(self.__editorWidget.helper):
+		# for widgetName in slicer.util.findChildren(self.__editorWidget.helper):
 			# widget = slicer.util.findChildren(self.__editorWidget.editBoxFrame)
-			print widgetName.objectName
+			# print widgetName.objectName
 			# print widgetName.parent.name
 			# widgetName.hide()
+		# print slicer.util.findChildren('','EditColorFrame')
+
 		for widget in ['DrawEffectToolButton', 'RectangleEffectToolButton', 'IdentifyIslandsEffectToolButton', 'RemoveIslandsEffectToolButton', 'SaveIslandEffectToolButton', 'RowFrame2']:
 			slicer.util.findChildren(self.__editorWidget.editBoxFrame, widget)[0].hide()
-		print slicer.util.findChildren('','EditColorFrame')
 
 	def Restart( self ):
 
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(self.__pNode.GetParameter('clippingModelNodeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(self.__pNode.GetParameter('clippingMarkupNodeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(self.__pNode.GetParameter('subtractVolumeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(self.__pNode.GetParameter('croppedVolumeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(self.__pNode.GetParameter('roiNodeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(self.__pNode.GetParameter('roiTransformID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(self.__pNode.GetParameter('clippingModelNodeID')))
-		# slicer.mrmlScene.RemoveNode(Helper.getNodeByID(self.__pNode.GetParameter('vrDisplayNodeID')))
+		pNode = self.parameterNode()
+		print pNode
 
-		for node in [self.__pNode.GetParameter('normalizeVolume_0'), self.__pNode.GetParameter('normalizeVolume_1'),self.__pNode.GetParameter('registrationVolumeID')]:
-			if node != self.__pNode.GetParameter('baselineVolumeID') and node != self.__pNode.GetParameter('followupVolumeID'):
+		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingModelNodeID')))
+		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingMarkupNodeID')))
+		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('subtractVolumeID')))
+		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('croppedVolumeID')))
+		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('roiNodeID')))
+		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('roiTransformID')))
+		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingModelNodeID')))
+		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('vrDisplayNodeID')))
+
+		for node in [pNode.GetParameter('baselineNormalizeVolumeID'), pNode.GetParameter('followupNormalizeVolumeID'),pNode.GetParameter('registrationVolumeID')]:
+			if node != pNode.GetParameter('baselineVolumeID') and node != pNode.GetParameter('followupVolumeID'):
 				slicer.mrmlScene.RemoveNode(Helper.getNodeByID(node))
 
-		self.__pNode.SetParameter('outputList', '')	
-		self.__pNode.SetParameter('modelList', '')	
-		self.__pNode.SetParameter('baselineVolumeID', '')		
-		self.__pNode.SetParameter('clippingMarkupNodeID', '')
-		self.__pNode.SetParameter('clippingModelNodeID', '')
-		self.__pNode.SetParameter('normalizeVolume_0', '')
-		self.__pNode.SetParameter('normalizeVolume_1', '')
-		self.__pNode.SetParameter('croppedVolumeID', '')
-		self.__pNode.SetParameter('croppedVolumeSegmentationID', '')
-		self.__pNode.SetParameter('followupVolumeID', '')
-		self.__pNode.SetParameter('roiNodeID', '')
-		self.__pNode.SetParameter('roiTransformID', '')
-		self.__pNode.SetParameter('subtractVolumeID', '')
-		# self.__pNode.SetParameter('vrDisplayNodeID', '')
-		self.__pNode.SetParameter('thresholdRange', '')
-		self.__pNode.SetParameter('registrationVolumeID', '')
-		self.__pNode.SetParameter('modelSegmentationID', '')
+		pNode.SetParameter('baselineVolumeID', '')	
+		pNode.SetParameter('followupVolumeID', '')
+		pNode.SetParameter('originalBaselineVolumeID', '')	
+		pNode.SetParameter('originalFollowupVolumeID', '')
+
+		pNode.SetParameter('registrationVolumeID', '')
+
+		pNode.SetParameter('baselineNormalizeVolumeID', '')
+		pNode.SetParameter('followupNormalizeVolumeID', '')
+		pNode.SetParameter('subtractVolumeID', '')
+
+		pNode.SetParameter('clippingMarkupNodeID', '')
+		pNode.SetParameter('clippingModelNodeID', '')
+		pNode.SetParameter('outputList', '')	
+		pNode.SetParameter('modelList', '')	
+
+		pNode.SetParameter('modelLabelID', '')
+		pNode.SetParameter('croppedVolumeID', '')
+		pNode.SetParameter('croppedVolumeLabelID', '')
+
+		pNode.SetParameter('roiNodeID', '')
+		pNode.SetParameter('roiTransformID', '')
+
+		pNode.SetParameter('vrDisplayNodeID', '')
+		pNode.SetParameter('intensityThreshRange', '')
+		pNode.SetParameter('vrThreshRange', '')
 
 		Helper.SetLabelVolume('')
 
@@ -223,7 +243,25 @@ class ReviewStep( BeersSingleStep ) :
 		self.__RestartActivated = True
 
 		pNode = self.parameterNode()
-		self.__pNode = pNode
+
+		self.updateWidgetFromParameters(pNode)
+
+		# What does this do?
+		# self.__vrDisplayNode.VisibilityOn()
+
+		Helper.SetBgFgVolumes(self.__visualizedID,'')
+		Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
+
+		self.onThresholdChanged()
+
+		pNode.SetParameter('currentStep', self.stepid)
+	
+		qt.QTimer.singleShot(0, self.killButton)
+
+	def updateWidgetFromParameters(self, pNode):
+
+		# Many of these are obviously redundant. Not sure why they were
+		# all typed out in the first place.
 
 		self.__clippingModelNode = Helper.getNodeByID(pNode.GetParameter('clippingModelNodeID'))
 		self.__baselineVolumeID = pNode.GetParameter('baselineVolumeID')
@@ -240,49 +278,38 @@ class ReviewStep( BeersSingleStep ) :
 		self.__editorWidget.setMergeNode(self.__roiSegmentationNode)
 		self.__clippingModelNode.GetDisplayNode().VisibilityOn()
 
-
 		if self.__followupVolumeID == None or self.__followupVolumeID == '':
 			self.__visualizedNode = self.__baselineVolumeNode
 			self.__visualizedID = self.__baselineVolumeID
-			vrRange = self.__baselineVolumeNode.GetImageData().GetScalarRange()
 		else:
 			self.__visualizedID = self.__followupVolumeID
 			self.__visualizedNode = self.__followupVolumeNode
-			vrRange = self.__followupVolumeNode.GetImageData().GetScalarRange()
 
-		ROIRange = self.__roiSegmentationNode.GetImageData().GetScalarRange()
+		vrRange = self.__visualizedNode.GetImageData().GetScalarRange()
 
 		if self.__vrDisplayNode == None:
 			if self.__vrDisplayNodeID != '':
 				self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(self.__vrDisplayNodeID)
 
-		self.__vrDisplayNode.SetCroppingEnabled(1)
 		self.__visualizedNode.AddAndObserveDisplayNodeID(self.__vrDisplayNode.GetID())
 		Helper.InitVRDisplayNode(self.__vrDisplayNode, self.__visualizedID, self.__roiNodeID)
 
 		self.__threshRange.minimum = vrRange[0]
 		self.__threshRange.maximum = vrRange[1]
-		self.__threshRange.setValues(vrRange[1]/3, 2*vrRange[1]/3)
+
+		if pNode.GetParameter('vrThreshRangeMin') == '' or pNode.GetParameter('vrThreshRangeMin') == None:
+			self.__threshRange.setValues(vrRange[1]/3, 2*vrRange[1]/3)
+		else:
+			self.__threshRange.setValues(int(pNode.GetParameter('vrThreshRangeMin')), int(pNode.GetParameter('vrThreshRangeMax')))
 
 		self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
-		vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
+		self.__vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
 
-		vrColorMap.RemoveAllPoints()
-		vrColorMap.AddRGBPoint(vrRange[0], 0.8, 0.8, 0) 
-		vrColorMap.AddRGBPoint(vrRange[1], 0.8, 0.8, 0) 
-
-
-		self.__vrDisplayNode.VisibilityOn()
-
-		Helper.SetBgFgVolumes(self.__visualizedID,'')
-		Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
-
-		self.onThresholdChanged()
-
-		pNode.SetParameter('currentStep', self.stepid)
-	
-		qt.QTimer.singleShot(0, self.killButton)
+		self.__vrColorMap.RemoveAllPoints()
+		self.__vrColorMap.AddRGBPoint(vrRange[0], 0.8, 0.8, 0) 
+		self.__vrColorMap.AddRGBPoint(vrRange[1], 0.8, 0.8, 0) 
 
 	def onExit(self, goingTo, transitionType):   
+
 		# extra error checking, in case the user manages to click ReportROI button
-		super(BeersSingleStep, self).onExit(goingTo, transitionType) 
+		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 

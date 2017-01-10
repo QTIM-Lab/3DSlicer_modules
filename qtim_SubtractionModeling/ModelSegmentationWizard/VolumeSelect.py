@@ -169,6 +169,11 @@ class VolumeSelectStep(ModelSegmentationStep) :
 
 	def onExit(self, goingTo, transitionType):   
 
+		# Need to check - if you go through to say, step 5, then go
+		# all the way back to step one and change the volumes to reset,
+		# then a piece of code should reset all parameter values at this point.
+		# Essentially, the module has been restarted, one imagines.
+
 		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 
 
 	def updateWidgetFromParameters(self, parameterNode):

@@ -1,6 +1,7 @@
 """ This is Step 3. The user has the option to normalize intensity values
 	across pre- and post-contrast images before performing a subtraction
-	on them.
+	on them. TODO: Add histogram-matching normalization (already in Slicer!)
+	instead of my present method which is somewhat inexplicable.
 """
 
 from __main__ import qt, ctk, slicer
@@ -135,7 +136,7 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 
 		pNode = self.parameterNode()
 		pNode.SetParameter('currentStep', self.stepid)
-		Helper.SetBgFgVolumes(pNode.GetParameter('baselineVolumeID'),pNode.GetParameter('followupVolumeID'))
+		Helper.SetBgFgVolumes(pNode.GetParameter('followupVolumeID'),pNode.GetParameter('baselineVolumeID'))
 		
 		qt.QTimer.singleShot(0, self.killButton)
 
@@ -165,11 +166,11 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 		baselineVolumeID = pNode.GetParameter('baselineVolumeID')
 		followupVolumeID = pNode.GetParameter('followupVolumeID')
 
-		baselineNode = slicer.mrmlScene.GetNodeByID(baselineLabel)
-		followupNode = slicer.mrmlScene.GetNodeByID(followupLabel)
+		baselineNode = slicer.mrmlScene.GetNodeByID(baselineVolumeID)
+		followupNode = slicer.mrmlScene.GetNodeByID(followupVolumeID)
 
-		baselineName = baselineNode.getName()
-		followupName = followupNode.getName()
+		baselineName = baselineNode.GetName()
+		followupName = followupNode.GetName()
 
 		baselineImage = baselineNode.GetImageData()
 		followupImage = followupNode.GetImageData()
@@ -223,7 +224,7 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 				nodeArray[i].SetAndObserveImageData(imageArray[i])
 				pNode.SetParameter(typeArray[i] + 'NormalizeVolumeID', nodeArray[i].GetID())
 
-		Helper.SetBgFgVolumes(pNode.GetParameter('baselineNormalizeVolumeID'), pNode.GetParameter('followupNormalizeVolumeID'))
+		Helper.SetBgFgVolumes(pNode.GetParameter('followupNormalizeVolumeID'), pNode.GetParameter('baselineNormalizeVolumeID'))
 
 		self.__normalizationButton.setText('Normalization complete!')
 
@@ -237,12 +238,12 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 
 		pNode = self.parameterNode()
 
-		if pNode.GetParameter('normalizeVolume_1') == None or pNode.GetParameter('normalizeVolume_1') == '':
+		if pNode.GetParameter('followupNormalizeVolumeID') == None or pNode.GetParameter('followupNormalizeVolumeID') == '':
 			baselineVolumeID = pNode.GetParameter('baselineVolumeID')
 			followupVolumeID = pNode.GetParameter('followupVolumeID')
 		else:
-			baselineVolumeID = pNode.GetParameter('normalizeVolume_0')
-			followupVolumeID = pNode.GetParameter('normalizeVolume_1')
+			baselineVolumeID = pNode.GetParameter('baselineNormalizeVolumeID')
+			followupVolumeID = pNode.GetParameter('followupNormalizeVolumeID')
 
 		followupVolume = Helper.getNodeByID(followupVolumeID)
 		baselineVolume = Helper.getNodeByID(baselineVolumeID)
@@ -251,7 +252,7 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 		if subtractID == None or subtractID == '':
 			subtractVolume = slicer.vtkMRMLScalarVolumeNode()
 			subtractVolume.SetScene(slicer.mrmlScene)
-			subtractVolume.SetName(Helper.getNodeByID(pNode.GetParameter('baselineVolumeID')).GetName() + '_subtraction')
+			subtractVolume.SetName(Helper.getNodeByID(followupVolumeID).GetName() + '_subtraction')
 			slicer.mrmlScene.AddNode(subtractVolume)
 		else:
 			subtractVolume = Helper.getNodeByID(subtractID)
@@ -283,3 +284,5 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 
 		if self.__status == 'Completed':
 			self.__subtractionButton.setText('Subtraction completed!')
+			pNode = self.parameterNode()
+			Helper.SetBgFgVolumes(pNode.GetParameter('subtractVolumeID'), pNode.GetParameter('followupNormalizeVolumeID'))

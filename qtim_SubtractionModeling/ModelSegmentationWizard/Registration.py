@@ -237,11 +237,11 @@ class RegistrationStep( ModelSegmentationStep ) :
 				slicer.mrmlScene.AddNode(registrationVolume)
 				pNode.SetParameter('registrationVolumeID', registrationVolume.GetID())
 				if self.__OrderRadio1.isChecked():
-					pNode.SetParameter('followupVolumeID', registrationVolume.GetID())
-					pNode.SetParameter('originalFollowupVolumeID', movingVolumeID)
-				else:
 					pNode.SetParameter('baselineVolumeID', registrationVolume.GetID())
 					pNode.SetParameter('originalBaselineVolumeID', movingVolumeID)
+				else:
+					pNode.SetParameter('followupVolumeID', registrationVolume.GetID())
+					pNode.SetParameter('originalFollowupVolumeID', movingVolumeID)
 				parameters['outputVolume'] = registrationVolume
 
 			print parameters

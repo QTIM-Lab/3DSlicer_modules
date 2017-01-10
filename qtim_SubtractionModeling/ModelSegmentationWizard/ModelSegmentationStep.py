@@ -41,6 +41,8 @@ class ModelSegmentationStep( ctk.ctkWorkflowWidgetStep ) :
 			Trigger upon clicking Next and Previous buttons.
 		"""
 
+		print self.parameterNode()
+
 		comingFromId = "None"
 		if comingFrom: 
 			comingFromId = comingFrom.id()
