@@ -94,6 +94,18 @@ class ROIStep( ModelSegmentationStep ) :
 		self.__primaryGroupBoxLayout.addRow(step_label)
 		self.__layout.addRow(self.__primaryGroupBox)
 
+
+		# Toolbar with model buttons.
+		self.__roiToolbarGroupBox = qt.QGroupBox()
+		self.__roiToolbarGroupBox.setTitle('ROI Toolbar')
+		self.__roiToolbarGroupBoxLayout = qt.QFormLayout(self.__roiToolbarGroupBox)
+
+		self.__markupButton = qt.QToolButton()
+		self.__markupButton.icon = qt.QIcon.addFile('TestIcon.png')
+		self.__roiToolbarGroupBoxLayout.addRow('Toolbar Test Row', self.__markupButton)
+
+		self.__layout.addRow(self.__roiToolbarGroupBox)
+
 		# I'm referring to the Delaunay Triangulation as a "Convex ROI"
 		# I don't think this is very clear; a better title would be good.
 		self.__convexGroupBox = qt.QGroupBox()
