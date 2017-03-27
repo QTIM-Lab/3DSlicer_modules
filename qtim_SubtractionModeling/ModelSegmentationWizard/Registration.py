@@ -39,7 +39,7 @@ class RegistrationStep( ModelSegmentationStep ) :
 
 		self.__layout = self.__parent.createUserInterface()
 
-		step_label = qt.QLabel( """Select your preferred method of registration. If you have already registered your images, or no registration is required, check the option "No Registration." Your post-contrast image will be registered to your pre-contrast image, and then resampled at the new registration. Be aware that many other modules in Slicer have more complex and/or customizable registration methods, should the methods in this step prove insufficient.
+		step_label = qt.QLabel( """Select your preferred method of registration. If you have already registered your images, or no registration is required, check the option "No Registration." The moving image will be registered to the fixed image, and then resampled at the dimensions of the fixed image. Be aware that many other modules in Slicer have more complex and/or customizable registration methods, should you require more thorough registration.
 			""")
 		step_label.setWordWrap(True)
 		self.__primaryGroupBox = qt.QGroupBox()

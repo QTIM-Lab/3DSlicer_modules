@@ -81,20 +81,20 @@ class ThresholdStep( ModelSegmentationStep ) :
 		range1 = self.__threshRange.maximumValue
 
 		# Use vtk to threshold the label volume.
+		if self.__roiVolume != None:
+			thresh = vtk.vtkImageThreshold()
+			if vtk.VTK_MAJOR_VERSION <= 5:
+				thresh.SetInput(self.__roiVolume.GetImageData())
+			else:
+				thresh.SetInputData(self.__roiVolume.GetImageData())
+			thresh.ThresholdBetween(range0, range1)
+			thresh.SetInValue(1)
+			thresh.SetOutValue(0)
+			thresh.ReplaceOutOn()
+			thresh.ReplaceInOn()
+			thresh.Update()
 
-		thresh = vtk.vtkImageThreshold()
-		if vtk.VTK_MAJOR_VERSION <= 5:
-			thresh.SetInput(self.__roiVolume.GetImageData())
-		else:
-			thresh.SetInputData(self.__roiVolume.GetImageData())
-		thresh.ThresholdBetween(range0, range1)
-		thresh.SetInValue(1)
-		thresh.SetOutValue(0)
-		thresh.ReplaceOutOn()
-		thresh.ReplaceInOn()
-		thresh.Update()
-
-		self.__roiLabelNode.SetAndObserveImageData(thresh.GetOutput())
+			self.__roiLabelNode.SetAndObserveImageData(thresh.GetOutput())
 
 	def killButton(self):
 		# ctk creates a useless final page button. This method gets rid of it.
@@ -121,15 +121,11 @@ class ThresholdStep( ModelSegmentationStep ) :
 		# and then returns? Need some way to check if self.__vrNode is currently
 		# being viewed.
 
-		self.__vrDisplayNodeID = pNode.GetParameter('vrDisplayNodeID')
-
-		if self.__vrDisplayNodeID == None or self.__vrDisplayNodeID != '':
-			self.InitVRDisplayNode()
-			self.__vrDisplayNodeID = self.__vrDisplayNode.GetID()
-		else:
-			self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(vrDisplayNodeID)
-
+		self.__vrDisplayNode = Helper.getNodeByID(pNode.GetParameter('vrDisplayNodeID'))
 		self.updateWidgetFromParameters(pNode)
+
+		if self.__vrDisplayNode == None or self.__vrDisplayNode != '':
+			self.InitVRDisplayNode()
 
 		# Retrieves necessary nodes.
 		roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
@@ -186,16 +182,10 @@ class ThresholdStep( ModelSegmentationStep ) :
 			Helper.SetBgFgVolumes(pNode.GetParameter('subtractVolumeID'), pNode.GetParameter('followupVolumeID'))
 			self.__visualizedVolume = Helper.getNodeByID(pNode.GetParameter('subtractVolumeID'))
 
-		ROIVolume = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
-		ROIRange = ROIVolume.GetImageData().GetScalarRange()
-		self.__threshRange.minimum = ROIRange[0]
-		self.__threshRange.maximum = ROIRange[1]
-
-		thresholdRange = [int(pNode.GetParameter('intensityThreshRangeMin')), int(pNode.GetParameter('intensityThreshRangeMax'))]
+		thresholdRange = [float(pNode.GetParameter('intensityThreshRangeMin')), float(pNode.GetParameter('intensityThreshRangeMax'))]
 		if thresholdRange != '':
-			rangeArray = string.split(thresholdRange, ',')
-			self.__threshRange.minimumValue = float(rangeArray[0])
-			self.__threshRange.maximumValue = float(rangeArray[1])
+			self.__threshRange.minimumValue = float(thresholdRange[0])
+			self.__threshRange.maximumValue = float(thresholdRange[1])
 		else:
 			Helper.Error('Unexpected parameter values! Error code CT-S03-TNA. Please report')
 
@@ -212,10 +202,10 @@ class ThresholdStep( ModelSegmentationStep ) :
 			pNode.SetParameter('vrDisplayNodeID', self.__vrDisplayNode.GetID())
 
 		roiRange = self.__threshRange
-		pNode.SetParameter('intensityThreshRangeMin', str(roiRange[0]))
-		pNode.SetParameter('intensityThreshRangeMax', str(roiRange[1]))
-		pNode.SetParameter('vrThreshRangeMin', str(roiRange[0]))
-		pNode.SetParameter('vrThreshRangeMax', str(roiRange[1]))
+		pNode.SetParameter('intensityThreshRangeMin', str(roiRange.minimumValue))
+		pNode.SetParameter('intensityThreshRangeMax', str(roiRange.maximumValue))
+		pNode.SetParameter('vrThreshRangeMin', str(roiRange.minimumValue))
+		pNode.SetParameter('vrThreshRangeMax', str(roiRange.maximumValue))
 
 		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 
 
@@ -231,7 +221,7 @@ class ThresholdStep( ModelSegmentationStep ) :
 			# Documentation on UnRegister is scant so far.
 			self.__vrDisplayNode.UnRegister(self.__vrLogic) 
 
-			Helper.InitVRDisplayNode(self.__vrDisplayNode, self.__visualizedVolume.GetID(), '')
+			Helper.InitVRDisplayNode(self.__vrDisplayNode.GetID(), self.__visualizedVolume.GetID(), '')
 			self.__visualizedVolume.AddAndObserveDisplayNodeID(self.__vrDisplayNode.GetID())
 
 		# This is a bit messy.
@@ -243,6 +233,8 @@ class ThresholdStep( ModelSegmentationStep ) :
 
 		self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
 		self.__vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
+
+		vrRange = self.__visualizedVolume.GetImageData().GetScalarRange()
 
 		# Renders in yellow, like the label map in the next steps.
 		self.__vrColorMap.RemoveAllPoints()

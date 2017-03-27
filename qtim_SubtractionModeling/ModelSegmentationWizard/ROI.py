@@ -18,6 +18,8 @@ from __main__ import qt, ctk, slicer
 from ModelSegmentationStep import *
 from Helper import *
 import PythonQt
+import os 
+from VolumeClipWithModel import *
 
 """ ROIStep inherits from ModelSegmentationStep, with itself inherits
 	from a ctk workflow class. PythonQT is required for this step
@@ -31,12 +33,9 @@ class ROIStep( ModelSegmentationStep ) :
 		""" This method creates a drop-down menu that includes the whole step.
 		The description also acts as a tooltip for the button. There may be 
 		some way to override this. The initialize method is inherited
-		from ctk.
-		"""
-
-		""" I got into the habit of creating a gratuitous amount of internal 
-			variables in this step. Where possible, some of these should be
-			pruned because they are hard to keep track of.
+		from ctk.I got into the habit of creating a gratuitous amount of internal 
+		variables in this step. Where possible, some of these should be
+		pruned because they are hard to keep track of.
 		"""
 
 		self.initialize( stepid )
@@ -84,6 +83,10 @@ class ROIStep( ModelSegmentationStep ) :
 			and know how to move labels in 3D space. 
 		"""
 
+		# Intialize Volume Rendering...
+		# Why here, if not init?
+		self.__vrLogic = slicer.modules.volumerendering.logic()
+
 		self.__layout = self.__parent.createUserInterface()
 
 		step_label = qt.QLabel( """Create either a convex ROI or a box ROI around the area you wish to threshold. Only voxels inside these ROIs will be thresholded in the next step. Click to add points to the convex ROI, or click and drag existing points to move them. A curved ROI will be filled in around these points. Similarly, click and drag the points on the box ROI to change its location and size.""")
@@ -94,14 +97,14 @@ class ROIStep( ModelSegmentationStep ) :
 		self.__primaryGroupBoxLayout.addRow(step_label)
 		self.__layout.addRow(self.__primaryGroupBox)
 
-
 		# Toolbar with model buttons.
 		self.__roiToolbarGroupBox = qt.QGroupBox()
 		self.__roiToolbarGroupBox.setTitle('ROI Toolbar')
 		self.__roiToolbarGroupBoxLayout = qt.QFormLayout(self.__roiToolbarGroupBox)
 
 		self.__markupButton = qt.QToolButton()
-		self.__markupButton.icon = qt.QIcon.addFile('TestIcon.png')
+		self.__markupButton.icon = qt.QIcon(os.path.join(os.path.dirname(__file__), 'MarkupsMouseModePlace.png'))
+		self.__markupButton.connect('clicked()', self.onMarkupClicked)
 		self.__roiToolbarGroupBoxLayout.addRow('Toolbar Test Row', self.__markupButton)
 
 		self.__layout.addRow(self.__roiToolbarGroupBox)
@@ -205,14 +208,20 @@ class ROIStep( ModelSegmentationStep ) :
 		# self.valueEditWidgets = {"ClipOutsideSurface": True, "FillValue": 0}
 		# # self.nodeSelectorWidgets = {"InputVolume": self.inputVolumeSelector, "ClippingModel": self.clippingModelSelector, "ClippingMarkup": self.clippingMarkupSelector, "OutputVolume": self.outputVolumeSelector}
 
-		# Intialize Volume Rendering...
-		# Why here, if not init?
-		self.__vrLogic = slicer.modules.volumerendering.logic()
-
 		qt.QTimer.singleShot(0, self.killButton)
 
 		# Likely more functions will need to be connected here.
 		self.__clippingModelSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onClippingModelSelect)
+
+	def onMarkupClicked(self):
+
+		markupButton = slicer.util.findChildren(name='CreateAndPlaceToolButton')[0]
+		persistentButton = slicer.util.findChildren(text='Persistent')[0]
+
+		markupButton.click()
+
+		if not persistentButton.checked:
+			persistentButton.trigger()
 
 	def onClippingModelSelect(self, node):
 
@@ -303,38 +312,6 @@ class ROIStep( ModelSegmentationStep ) :
 		pNode = self.parameterNode()
 		Helper.SetLabelVolume(None)
 
-		# Why slices now? I think this is held over from previous program.
-		slices = [lm.sliceWidget('Red'),lm.sliceWidget('Yellow'),lm.sliceWidget('Green')]
-		for s in slices:
-			s.sliceLogic().GetSliceNode().SetSliceVisible(0)
-
-		""" vtk, the image analysis library, and Slicer use different coordinate
-			systems: IJK and RAS, respectively. This prep calculates a simple matrix 
-			transformation on a ROI transform node to be used in the next step.
-		"""
-
-		roiTransformID = pNode.GetParameter('roiTransformID')
-
-		if roiTransformID != '':
-			roiTransformNode = Helper.getNodeByID(roiTransformID)
-		else:
-			roiTransformNode = slicer.vtkMRMLLinearTransformNode()
-			slicer.mrmlScene.AddNode(roiTransformNode)
-			pNode.SetParameter('roiTransformID', roiTransformNode.GetID())
-
-		self.__roiTransformID = roiTransformID
-
-		# TODO: Understand the precise math behind this section of code..
-		dm = vtk.vtkMatrix4x4()
-		self.__visualizedVolume.GetIJKToRASDirectionMatrix(dm)
-		dm.SetElement(0,3,0)
-		dm.SetElement(1,3,0)
-		dm.SetElement(2,3,0)
-		dm.SetElement(0,0,abs(dm.GetElement(0,0)))
-		dm.SetElement(1,1,abs(dm.GetElement(1,1)))
-		dm.SetElement(2,2,abs(dm.GetElement(2,2)))
-		roiTransformNode.SetAndObserveMatrixTransformToParent(dm)
-
 		# Unsure about this step... might be a hold-over.
 		if self.__roi != None:
 			self.__roi.SetDisplayVisibility(1)
@@ -363,9 +340,6 @@ class ROIStep( ModelSegmentationStep ) :
 		self.__baselineVolumeID = pNode.GetParameter('baselineVolumeID')
 		self.__followupVolumeID = pNode.GetParameter('followupVolumeID')
 		self.__subtractVolumeID = pNode.GetParameter('subtractVolumeID')
-		self.__baselineVolumeNode = Helper.getNodeByID(self.__baselineVolumeID)
-		self.__followupVolumeNode = Helper.getNodeByID(self.__followupVolumeID)
-		self.__subtractVolumeNode = Helper.getNodeByID(self.__subtractVolumeID)
 		self.__vrDisplayNodeID = pNode.GetParameter('vrDisplayNodeID') 
 
 		if self.__vrDisplayNode == None:
@@ -412,6 +386,7 @@ class ROIStep( ModelSegmentationStep ) :
 
 		vrRange = self.__visualizedVolume.GetImageData().GetScalarRange()
 
+		# Custom color-maps? Someday.
 		self.__vrColorMap.RemoveAllPoints()
 		self.__vrColorMap.AddRGBPoint(vrRange[0], 0.8, 0.8, 0) 
 		self.__vrColorMap.AddRGBPoint(vrRange[1], 0.8, 0.8, 0) 
@@ -432,359 +407,74 @@ class ROIStep( ModelSegmentationStep ) :
 
 		pNode = self.parameterNode()
 
-		pNode.SetParameter('vrThreshRangeMin', str(self.__threshRange[0]))
-		pNode.SetParameter('vrThresRangeMax', str(self.__threshRange[1]))
+		pNode.SetParameter('vrThreshRangeMin', str(self.__threshRange.minimum))
+		pNode.SetParameter('vrThresRangeMax', str(self.__threshRange.maximum))
 
 		if goingTo.id() == 'ThresholdStep':
-			# Does a great deal of work to prepare for the segmentation step.
-			self.ThresholdPrep()
+			
+			pNode = self.parameterNode()
+			baselineVolumeID = pNode.GetParameter('baselineVolumeID')
+			followupVolumeID = pNode.GetParameter('followupVolumeID')
 
-			# lm = slicer.app.layoutManager()
-			# slices = [lm.sliceWidget('Red'),lm.sliceWidget('Yellow'),lm.sliceWidget('Green')]
-			# for s in slices:
-			# 	s.sliceLogic().GetSliceNode().SetSliceVisible(0)
+			followupVolume = Helper.getNodeByID(followupVolumeID)
+			baselineVolume = Helper.getNodeByID(baselineVolumeID)
+
+			for ROI_idx, ROI in enumerate(self.__markupList):
+				if ROI[2] == 'Convex' and ROI_idx == 0:
+
+					if pNode.GetParameter('croppedVolumeID') == '' or pNode.GetParameter('croppedVolumeID') == None:
+						outputVolume = slicer.vtkMRMLScalarVolumeNode()
+						slicer.mrmlScene.AddNode(outputVolume)
+					else:
+						outputVolume = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
+
+					Helper.SetLabelVolume(None)
+
+					# Crop volume to Convex ROI
+					inputVolume = self.__visualizedVolume
+					clippingModel = Helper.getNodeByID(ROI[0])
+					clipOutsideSurface = True
+
+					# Bit of an arbitrary value.. One less than the minimum of the image.
+					self.__fillValue = inputVolume.GetImageData().GetScalarRange()[0] - 1
+
+					self.__logic.clipVolumeWithModel(inputVolume, clippingModel, clipOutsideSurface, self.__fillValue, outputVolume)
+
+					# I don't think OutputList is currently useful. The better tool would be to merge several models.
+					self.__outputList.append(outputVolume.GetID())
+
+					outputVolume.SetName(baselineVolume.GetName() + '_roi_image')
+
+			pNode.SetParameter('outputList', '__'.join(self.__outputList))
+			pNode.SetParameter('modelList', '__'.join(self.__modelList))
+			pNode.SetParameter('croppedVolumeID',outputVolume.GetID())
+			pNode.SetParameter('ROIType', 'convex')
+
+			# Get starting threshold parameters.
+			roiRange = outputVolume.GetImageData().GetScalarRange()
+			thresholdParameter = str(0.5*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
+			pNode.SetParameter('intensityThreshRangeMin', str(roiRange[0]+1))
+			pNode.SetParameter('intensityThreshRangeMax', str(roiRange[1]))
+
+			# Create a label node for segmentation. Should one make a new one each time? Who knows
+			vl = slicer.modules.volumes.logic()
+
+			roiLabelID = pNode.GetParameter('croppedVolumeLabelID') 
+			if pNode.GetParameter('croppedVolumeLabelID') == '' or pNode.GetParameter('croppedVolumeLabelID') == None:
+				roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, outputVolume, baselineVolume.GetName() + '_roi_threshold')
+				pNode.SetParameter('croppedVolumeLabelID', roiSegmentation.GetID())
+			else:
+				roiSegmentation = Helper.getNodeByID(pNode.GetParameter('croppedVolumeLabelID'))
+			pNode.SetParameter('modelLabelID', roiSegmentation.GetID())
+
+			self.__clippingMarkupNode.RemoveObserver(self.__clippingMarkupNodeObserver)
+			self.__clippingMarkupNodeObserver = None
 
 			pNode.SetParameter('clippingModelNodeID', self.__clippingModelSelector.currentNode().GetID())
-			# pNode.SetParameter('clippingMarkupNodesID', self.__clippingMarkupSelector.currentNode().GetID())
 			for ROI in self.__markupList:
-				# Helper.getNodeByID(ROI[0]).GetDisplayNode().VisibilityOff()
 				Helper.getNodeByID(ROI[1]).GetDisplayNode().VisibilityOff()
 
-			# if self.__roi != None:
-			# 	self.__roi.RemoveObserver(self.__roiObserverTag)
-			# 	self.__roi.SetDisplayVisibility(0)
-
 			if self.__vrDisplayNode != None and self.__vrDisplayNode != '':
-				# self.__vrDisplayNode.VisibilityOff()
 				pNode.SetParameter('vrDisplayNodeID', self.__vrDisplayNode.GetID())
 
-			if self.__CubicROI:
-				pNode.SetParameter('roiNodeID', self.__roiSelector.currentNode().GetID())
-
 		super(ROIStep, self).onExit(goingTo, transitionType)
-
-	def ThresholdPrep(self):
-
-		""" This method prepares for the following segmentation/thresholding
-			step. It accomplishes a few things. It uses the cropvolume Slicer
-			module to create a new, ROI-only node. It then creates a label volume
-			and initializes threholds variables for the next step.
-		"""
-
-		pNode = self.parameterNode()
-		baselineVolumeID = pNode.GetParameter('baselineVolumeID')
-		followupVolumeID = pNode.GetParameter('followupVolumeID')
-
-		followupVolume = Helper.getNodeByID(followupVolumeID)
-		baselineVolume = Helper.getNodeByID(baselineVolumeID)
-
-		for ROI_idx, ROI in enumerate(self.__markupList):
-			if ROI[2] == 'Convex' and ROI_idx == 0:
-
-				if pNode.GetParameter('croppedVolumeID') == '' or pNode.GetParameter('croppedVolumeID') == None:
-					outputVolume = slicer.vtkMRMLScalarVolumeNode()
-					slicer.mrmlScene.AddNode(outputVolume)
-				else:
-					outputVolume = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
-
-				Helper.SetLabelVolume(None)
-
-				# Crop volume to Convex ROI
-				inputVolume = self.__visualizedVolume
-				clippingModel = Helper.getNodeByID(ROI[0])
-				clipOutsideSurface = True
-
-				# Bit of an arbitrary value..
-				self.__fillValue = inputVolume.GetImageData().GetScalarRange()[0] - 1
-
-				self.__logic.clipVolumeWithModel(inputVolume, clippingModel, clipOutsideSurface, self.__fillValue, outputVolume)
-
-				# I don't think OutputList is currently useful. The better tool would be to merge several models.
-				self.__outputList.append(outputVolume.GetID())
-
-				outputVolume.SetName(baselineVolume.GetName() + '_roi_image')
-
-		pNode.SetParameter('outputList', '__'.join(self.__outputList))
-		pNode.SetParameter('modelList', '__'.join(self.__modelList))
-
-		""" Below is some junk code that I was thinking about to combined separate modles into one threshold ROI.
-			Probably doesn't work. Better choice is to find a vtk function. 
-		"""
-
-		# volumesLogic = slicer.modules.volumes.logic()
-		# combinedOutputVolume = volumesLogic.CloneVolume(slicer.mrmlScene, baselineVolume, baselineVolume.GetName() + '_roi')
-		# volumesLogic.ClearVolumeImageData(combinedOutputVolume)
-		# combinedOutputImageData = combinedOutputVolume.GetImageData()
-		# shape = list(combinedOutputVolume.GetImageData().GetDimensions())
-		# shape.reverse()
-		# combinedOutputArray = vtk.util.numpy_support.vtk_to_numpy(combinedOutputImageData.GetPointData().GetScalars()).reshape(shape)
-
-		# for output_idx, output in enumerate(self.__outputList):
-
-		# 	outputNode = Helper.getNodeByID(output)
-		# 	# outputImageData = outputNode.GetImageData()
-		# 	# shape = list(outputNode.GetImageData().GetDimensions())
-		# 	# shape.reverse()
-		# 	# outputArray = vtk.util.numpy_support.vtk_to_numpy(outputImageData.GetPointData().GetScalars()).reshape(shape)
-
-		# 	parameters = {}
-		# 	parameters["inputVolume1"] = outputNode
-		# 	parameters["inputVolume2"] = combinedOutputVolume
-		# 	parameters['outputVolume'] = combinedOutputVolume
-		# 	parameters['order'] = '1'
-
-		# 	self.__cliNode = None
-		# 	self.__cliNode = slicer.cli.run(slicer.modules.addscalarvolumes, self.__cliNode, parameters)
-
-		pNode.SetParameter('croppedVolumeID',outputVolume.GetID())
-		pNode.SetParameter('ROIType', 'convex')
-
-		# Get starting threshold parameters.
-		roiLabelID = pNode.GetParameter('croppedVolumeLabelID') 
-		roiRange = outputVolume.GetImageData().GetScalarRange()
-		thresholdParameter = str(0.5*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
-		pNode.SetParameter('intensityThreshRangeMin', str(roiRange[0]))
-		pNode.SetParameter('intensityThreshRangeMax', str(roiRange[1]))
-
-		# Create a label node for segmentation. Should one make a new one each time? Who knows
-		vl = slicer.modules.volumes.logic()
-
-		if pNode.GetParameter('croppedVolumeLabelID') == '' or pNode.GetParameter('croppedVolumeLabelID') == None:
-			roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, outputVolume, baselineVolume.GetName() + '_roi_threshold')
-		else:
-			roiSegmentation = Helper.getNodeByID(pNode.GetParameter('croppedVolumeLabelID'))
-
-		pNode.SetParameter('croppedVolumeLabelID', roiSegmentation.GetID())
-
-		if pNode.GetParameter('modelLabelID') == '' or pNode.GetParameter('modelLabelID') == None:
-			roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, outputVolume, baselineVolume.GetName() + '_roi')
-		else:
-			roiSegmentation = Helper.getNodeByID(pNode.GetParameter('modelLabelID'))
-
-		pNode.SetParameter('modelLabelID', roiSegmentation.GetID())
-
-		self.__clippingMarkupNode.RemoveObserver(self.__clippingMarkupNodeObserver)
-		self.__clippingMarkupNodeObserver = None
-
-	""" The following are kept from ChangeTracker, might be useful later.
-	"""
-
-	# def cleanup(self):
-	# 	self.removeGUIObservers()
-	# 	self.setAndObserveParameterNode(None)
-	# 	self.setAndObserveClippingMarkupNode(None)
-	# 	pass
-
-	# def setAndObserveParameterNode(self, parameterNode):
-	# 	if parameterNode == self.__parameterNode and self.__parameterNodeObserver:
-	# 		# no change and node is already observed
-	# 		return
-	# 	# Remove observer to old parameter node
-	# 	if self.__parameterNode and self.__parameterNodeObserver:
-	# 		self.__parameterNode.RemoveObserver(self.__parameterNodeObserver)
-	# 		self.__parameterNodeObserver = None
-	# 	# Set and observe new parameter node
-	# 	self.__parameterNode = parameterNode
-	# 	if self.__parameterNode:
-	# 		self.__parameterNodeObserver = self.__parameterNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onParameterNodeModified)
-	# 	# Update GUI
-	# 	self.updateGUIFromParameterNode()
-
-	# def onParameterNodeModified(self, observer, eventid):
-	# 	self.updateGUIFromParameterNode()
-
-	# def getParameterNode(self):
-		# return self.__parameterNode
-
-class VolumeClipWithModelLogic(ScriptedLoadableModuleLogic):
-	"""This class should implement all the actual
-	computation done by your module.  The interface
-	should be such that other python code can import
-	this class and make use of the functionality without
-	requiring an instance of the Widget
-	"""
-
-	def createParameterNode(self):
-		# Set default parameters
-		node = ScriptedLoadableModuleLogic.createParameterNode(self)
-		node.SetName(slicer.mrmlScene.GetUniqueNameByString(self.moduleName))
-		node.SetParameter("ClipOutsideSurface", "1")
-		node.SetParameter("FillValue", "-1")
-		return node
-
-	def clipVolumeWithModel(self, inputVolume, clippingModel, clipOutsideSurface, fillValue, outputVolume):
-		"""
-		Fill voxels of the input volume inside/outside the clipping model with the provided fill value
-		"""
-		
-		# Determine the transform between the box and the image IJK coordinate systems
-		
-		rasToModel = vtk.vtkMatrix4x4()    
-		if clippingModel.GetTransformNodeID() != None:
-			modelTransformNode = slicer.mrmlScene.GetNodeByID(clippingModel.GetTransformNodeID())
-			boxToRas = vtk.vtkMatrix4x4()
-			modelTransformNode.GetMatrixTransformToWorld(boxToRas)
-			rasToModel.DeepCopy(boxToRas)
-			rasToModel.Invert()
-			
-		ijkToRas = vtk.vtkMatrix4x4()
-		inputVolume.GetIJKToRASMatrix( ijkToRas )
-
-		ijkToModel = vtk.vtkMatrix4x4()
-		vtk.vtkMatrix4x4.Multiply4x4(rasToModel,ijkToRas,ijkToModel)
-		modelToIjkTransform = vtk.vtkTransform()
-		modelToIjkTransform.SetMatrix(ijkToModel)
-		modelToIjkTransform.Inverse()
-		
-		transformModelToIjk=vtk.vtkTransformPolyDataFilter()
-		transformModelToIjk.SetTransform(modelToIjkTransform)
-		transformModelToIjk.SetInputConnection(clippingModel.GetPolyDataConnection())
-
-		# Use the stencil to fill the volume
-		
-		# Convert model to stencil
-		polyToStencil = vtk.vtkPolyDataToImageStencil()
-		polyToStencil.SetInputConnection(transformModelToIjk.GetOutputPort())
-		polyToStencil.SetOutputSpacing(inputVolume.GetImageData().GetSpacing())
-		polyToStencil.SetOutputOrigin(inputVolume.GetImageData().GetOrigin())
-		polyToStencil.SetOutputWholeExtent(inputVolume.GetImageData().GetExtent())
-		
-		# Apply the stencil to the volume
-		stencilToImage=vtk.vtkImageStencil()
-		stencilToImage.SetInputConnection(inputVolume.GetImageDataConnection())
-		stencilToImage.SetStencilConnection(polyToStencil.GetOutputPort())
-		if clipOutsideSurface:
-			stencilToImage.ReverseStencilOff()
-		else:
-			stencilToImage.ReverseStencilOn()
-		stencilToImage.SetBackgroundValue(fillValue)
-		stencilToImage.Update()
-
-		# Update the volume with the stencil operation result
-		outputImageData = vtk.vtkImageData()
-		outputImageData.DeepCopy(stencilToImage.GetOutput())
-		
-		outputVolume.SetAndObserveImageData(outputImageData);
-		outputVolume.SetIJKToRASMatrix(ijkToRas)
-
-		# Add a default display node to output volume node if it does not exist yet
-		if not outputVolume.GetDisplayNode:
-			displayNode=slicer.vtkMRMLScalarVolumeDisplayNode()
-			displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
-			slicer.mrmlScene.AddNode(displayNode)
-			outputVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
-
-		return True
-
-	def updateModelFromMarkup(self, inputMarkup, outputModel):
-		"""
-		Update model to enclose all points in the input markup list
-		"""
-		
-		# Delaunay triangulation is robust and creates nice smooth surfaces from a small number of points,
-		# however it can only generate convex surfaces robustly.
-		useDelaunay = True
-		
-		# Create polydata point set from markup points
-		
-		points = vtk.vtkPoints()
-		cellArray = vtk.vtkCellArray()
-		
-		numberOfPoints = inputMarkup.GetNumberOfFiducials()
-		
-		# Surface generation algorithms behave unpredictably when there are not enough points
-		# return if there are very few points
-		if useDelaunay:
-			if numberOfPoints<3:
-				return
-		else:
-			if numberOfPoints<10:
-				return
-
-		points.SetNumberOfPoints(numberOfPoints)
-		new_coord = [0.0, 0.0, 0.0]
-
-		for i in range(numberOfPoints):
-			inputMarkup.GetNthFiducialPosition(i,new_coord)
-			points.SetPoint(i, new_coord)
-
-		cellArray.InsertNextCell(numberOfPoints)
-		for i in range(numberOfPoints):
-			cellArray.InsertCellPoint(i)
-
-		pointPolyData = vtk.vtkPolyData()
-		pointPolyData.SetLines(cellArray)
-		pointPolyData.SetPoints(points)
-
-		
-		# Create surface from point set
-
-		if useDelaunay:
-					
-			delaunay = vtk.vtkDelaunay3D()
-			delaunay.SetInputData(pointPolyData)
-
-			surfaceFilter = vtk.vtkDataSetSurfaceFilter()
-			surfaceFilter.SetInputConnection(delaunay.GetOutputPort())
-
-			smoother = vtk.vtkButterflySubdivisionFilter()
-			smoother.SetInputConnection(surfaceFilter.GetOutputPort())
-			smoother.SetNumberOfSubdivisions(3)
-			smoother.Update()
-
-			outputModel.SetPolyDataConnection(smoother.GetOutputPort())
-			
-		else:
-			
-			surf = vtk.vtkSurfaceReconstructionFilter()
-			surf.SetInputData(pointPolyData)
-			surf.SetNeighborhoodSize(20)
-			surf.SetSampleSpacing(80) # lower value follows the small details more closely but more dense pointset is needed as input
-
-			cf = vtk.vtkContourFilter()
-			cf.SetInputConnection(surf.GetOutputPort())
-			cf.SetValue(0, 0.0)
-
-			# Sometimes the contouring algorithm can create a volume whose gradient
-			# vector and ordering of polygon (using the right hand rule) are
-			# inconsistent. vtkReverseSense cures this problem.
-			reverse = vtk.vtkReverseSense()
-			reverse.SetInputConnection(cf.GetOutputPort())
-			reverse.ReverseCellsOff()
-			reverse.ReverseNormalsOff()
-
-			outputModel.SetPolyDataConnection(reverse.GetOutputPort())
-
-		# Create default model display node if does not exist yet
-		if not outputModel.GetDisplayNode():
-			modelDisplayNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLModelDisplayNode")
-			modelDisplayNode.SetColor(0,0,1) # Blue
-			modelDisplayNode.BackfaceCullingOff()
-			modelDisplayNode.SliceIntersectionVisibilityOn()
-			modelDisplayNode.SetOpacity(0.3) # Between 0-1, 1 being opaque
-			slicer.mrmlScene.AddNode(modelDisplayNode)
-			outputModel.SetAndObserveDisplayNodeID(modelDisplayNode.GetID())
-	
-		outputModel.GetDisplayNode().SliceIntersectionVisibilityOn()
-			
-		outputModel.Modified()
-
-	def showInSliceViewers(self, volumeNode, sliceWidgetNames):
-		# Displays volumeNode in the selected slice viewers as background volume
-		# Existing background volume is pushed to foreground, existing foreground volume will not be shown anymore
-		# sliceWidgetNames is a list of slice view names, such as ["Yellow", "Green"]
-		if not volumeNode:
-			return
-		newVolumeNodeID = volumeNode.GetID()
-		for sliceWidgetName in sliceWidgetNames:
-			sliceLogic = slicer.app.layoutManager().sliceWidget(sliceWidgetName).sliceLogic()
-			foregroundVolumeNodeID = sliceLogic.GetSliceCompositeNode().GetForegroundVolumeID()
-			backgroundVolumeNodeID = sliceLogic.GetSliceCompositeNode().GetBackgroundVolumeID()
-			if foregroundVolumeNodeID == newVolumeNodeID or backgroundVolumeNodeID == newVolumeNodeID:
-				# new volume is already shown as foreground or background
-				continue
-			if backgroundVolumeNodeID:
-				# there is a background volume, push it to the foreground because we will replace the background volume
-				sliceLogic.GetSliceCompositeNode().SetForegroundVolumeID(backgroundVolumeNodeID)
-			# show the new volume as background
-			sliceLogic.GetSliceCompositeNode().SetBackgroundVolumeID(newVolumeNodeID)

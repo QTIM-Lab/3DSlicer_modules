@@ -37,7 +37,7 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 
 		self.__layout = self.__parent.createUserInterface()
 
-		step_label = qt.QLabel( """You have the option to normalize the intensities between your images before you subtract them. This may lead to better contrast in the resulting image. The method below divides both images by the standard deviation of their intensities in order to get a measure of relative intensity. Changes in intensity as rendered in the scene may only be slight.""")
+		step_label = qt.QLabel( """You may normalize intensities between your two images. This may help when setting an intensity threshold""")
 		step_label.setWordWrap(True)
 		self.__primaryGroupBox = qt.QGroupBox()
 		self.__primaryGroupBox.setTitle('Information')
@@ -54,7 +54,7 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 
 		self.__normalizationButton = qt.QPushButton('Run Gaussian Normalization')
 		NormGroupBoxLayout.addRow(self.__normalizationButton)
-		self.__normalizationButton.connect('clicked()', self.onNormalizationRequest)
+		self.__normalizationButton.connect('clicked()', self.onGaussianNormalizationRequest)
 		self.__normalizationButton.setEnabled(1)
 
 		# Create new volumes options.
@@ -144,7 +144,7 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 
 		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 
 
-	def onNormalizationRequest(self):
+	def onGaussianNormalizationRequest(self):
 
 		""" This method uses vtk algorithms to perform simple image calculations. Slicer 
 			images are stored in vtkImageData format, making it difficult to edit them
@@ -160,7 +160,6 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 		self.__normalizationButton.setText('Normalization running...')
 
 		pNode = self.parameterNode()
-
 		volumesLogic = slicer.modules.volumes.logic()
 
 		baselineVolumeID = pNode.GetParameter('baselineVolumeID')
@@ -169,16 +168,10 @@ class NormalizeSubtractStep( ModelSegmentationStep ) :
 		baselineNode = slicer.mrmlScene.GetNodeByID(baselineVolumeID)
 		followupNode = slicer.mrmlScene.GetNodeByID(followupVolumeID)
 
-		baselineName = baselineNode.GetName()
-		followupName = followupNode.GetName()
-
-		baselineImage = baselineNode.GetImageData()
-		followupImage = followupNode.GetImageData()
-
 		typeArray = ['baseline', 'followup']
 		nodeArray = [baselineNode, followupNode]
-		nameArray = [baselineName, followupName]
-		imageArray = [baselineImage, followupImage]
+		nameArray = [baselineNode.GetName(), followupNode.GetName()]
+		imageArray = [baselineNode.GetImageData(), followupNode.GetImageData()]
 		resultArray = ['','']
 		stdArray = [0,0]
 		maxArray = [0,0]

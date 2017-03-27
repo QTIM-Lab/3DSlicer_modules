@@ -89,32 +89,37 @@ class ReviewStep( ModelSegmentationStep ) :
 		self.__RemoveRegisteredImage = qt.QCheckBox()
 		self.__RemoveRegisteredImage.checked = True
 		self.__RemoveRegisteredImage.setToolTip("Delete new images resulting from registration.")
-		RestartGroupBoxLayout.addRow("Delete registered images: ", self.__RemoveRegisteredImage)  
+		RestartGroupBoxLayout.addRow("Delete Registered images: ", self.__RemoveRegisteredImage)  
 
-		self.__RemoveCroppedSubtractionMap = qt.QCheckBox()
-		self.__RemoveCroppedSubtractionMap.checked = True
-		self.__RemoveCroppedSubtractionMap.setToolTip("Delete images produced via normalization.")
-		RestartGroupBoxLayout.addRow("Delete normalized images: ", self.__RemoveCroppedSubtractionMap)   
+		self.__RemoveNormalizedImages = qt.QCheckBox()
+		self.__RemoveNormalizedImages.checked = True
+		self.__RemoveNormalizedImages.setToolTip("Delete images produced via normalization.")
+		RestartGroupBoxLayout.addRow("Delete Normalized images: ", self.__RemoveCroppedSubtractionMap)   
 
-		self.__RemoveFullSubtractionMap = qt.QCheckBox()
-		self.__RemoveFullSubtractionMap.checked = True
-		self.__RemoveFullSubtractionMap.setToolTip("Delete the full version of your subtraction map.")
-		RestartGroupBoxLayout.addRow("Delete full subtraction map: ", self.__RemoveFullSubtractionMap)    
+		self.__RemoveSubtractionMap = qt.QCheckBox()
+		self.__RemoveSubtractionMap.checked = True
+		self.__RemoveSubtractionMap.setToolTip("Delete the full version of your subtraction map.")
+		RestartGroupBoxLayout.addRow("Delete Subtraction map: ", self.__RemoveSubtractionMap)    
 
 		self.__RemoveCroppedMap = qt.QCheckBox()
 		self.__RemoveCroppedMap.checked = True
 		self.__RemoveCroppedMap.setToolTip("Delete the cropped version of your segmented volume.")
-		RestartGroupBoxLayout.addRow("Delete cropped map: ", self.__RemoveCroppedMap)     
+		RestartGroupBoxLayout.addRow("Delete Cropped volume: ", self.__RemoveCroppedMap)     
 
 		self.__RemoveROI = qt.QCheckBox()
 		self.__RemoveROI.checked = False
 		self.__RemoveROI.setToolTip("Delete the ROI resulting from thresholding your original ROI.")
-		RestartGroupBoxLayout.addRow("Delete thresholded ROI: ", self.__RemoveROI)    
+		RestartGroupBoxLayout.addRow("Delete Full ROI: ", self.__RemoveROIModel)    
 
 		self.__RemoveROIModel = qt.QCheckBox()
 		self.__RemoveROIModel.checked = False
-		self.__RemoveROIModel.setToolTip("Delete the ROI resulting from your 3D Model.")
-		RestartGroupBoxLayout.addRow("Delete ROI from model: ", self.__RemoveROIModel) 
+		self.__RemoveROIModel.setToolTip("Delete the ROI resulting from thresholding your original ROI.")
+		RestartGroupBoxLayout.addRow("Delete Thresholded ROI: ", self.__RemoveROI) 
+
+		self.__RemoveMarkups = qt.QCheckBox()
+		self.__RemoveMarkups.checked = True
+		self.__RemoveMarkups.setToolTip("Delete the markup points you used to make your ROI.")
+		RestartGroupBoxLayout.addRow("Delete Markup Model: ", self.__RemoveMarkups) 
 
 		self.__RestartButton.connect('clicked()', self.Restart)
 		self.__RestartActivated = True
@@ -125,6 +130,9 @@ class ReviewStep( ModelSegmentationStep ) :
 
 		""" We import the Editor module wholesale, which is useful, but it means
 			we have to manually hide parts we don't want after the fact..
+			If we could somehow import the segmentations module instaed, that
+			might be better. On the other hand, first-time users often don't know
+			how to use the segmentations module.
 		"""
 
 		self.__editorWidget.volumes.hide()
@@ -148,16 +156,31 @@ class ReviewStep( ModelSegmentationStep ) :
 
 		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingModelNodeID')))
 		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingMarkupNodeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('subtractVolumeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('croppedVolumeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('roiNodeID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('roiTransformID')))
-		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingModelNodeID')))
 		slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('vrDisplayNodeID')))
 
-		for node in [pNode.GetParameter('baselineNormalizeVolumeID'), pNode.GetParameter('followupNormalizeVolumeID'),pNode.GetParameter('registrationVolumeID')]:
-			if node != pNode.GetParameter('baselineVolumeID') and node != pNode.GetParameter('followupVolumeID'):
-				slicer.mrmlScene.RemoveNode(Helper.getNodeByID(node))
+		if self.__RemoveRegisteredImage.checked:
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('registrationVolumeID')))
+
+		if self.__RemoveNormalizedImages.checked:
+			for node in [pNode.GetParameter('baselineNormalizeVolumeID'), pNode.GetParameter('followupNormalizeVolumeID')]:
+				if node != pNode.GetParameter('baselineVolumeID') and node != pNode.GetParameter('followupVolumeID'):
+					slicer.mrmlScene.RemoveNode(Helper.getNodeByID(node))
+
+		if self.__RemoveSubtractionMap.checked:
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('subtractVolumeID')))
+
+		if self.__RemoveCroppedMap.checked:
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('croppedVolumeID')))
+
+		if self.__RemoveROI.checked:
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('croppedVolumeLabelID')))
+
+		if self.__RemoveROIModel.checked:
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('modelLabelID')))
+
+		if self.__RemoveMarkups.checked:
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingModelNodeID')))
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingMarkupNodeID')))		
 
 		pNode.SetParameter('baselineVolumeID', '')	
 		pNode.SetParameter('followupVolumeID', '')
