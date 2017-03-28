@@ -38,7 +38,7 @@ class ReviewStep( ModelSegmentationStep ) :
 		self.__vrOpacityMap = None
 		self.__vrColorMap = None
 
-		self.__roiSegmentationNode = None
+		self.__thresholdedLabelNode = None
 		self.__roiVolume = None
 
 		self.__parent = super( ReviewStep, self )
@@ -59,17 +59,17 @@ class ReviewStep( ModelSegmentationStep ) :
 		self.__primaryGroupBoxLayout.addRow(step_label)
 		self.__layout.addRow(self.__primaryGroupBox)
 
-		self.__threshRange = slicer.qMRMLRangeWidget()
-		self.__threshRange.decimals = 0
-		self.__threshRange.singleStep = 1
-		self.__threshRange.connect('valuesChanged(double,double)', self.onThresholdChanged)
-		qt.QTimer.singleShot(0, self.killButton)
+		# self.__threshRange = slicer.qMRMLRangeWidget()
+		# self.__threshRange.decimals = 0
+		# self.__threshRange.singleStep = 1
+		# self.__threshRange.connect('valuesChanged(double,double)', self.onThresholdChanged)
+		# qt.QTimer.singleShot(0, self.killButton)
 
-		ThreshGroupBox = qt.QGroupBox()
-		ThreshGroupBox.setTitle('3D Visualization Intensity Threshold')
-		ThreshGroupBoxLayout = qt.QFormLayout(ThreshGroupBox)
-		ThreshGroupBoxLayout.addRow(self.__threshRange)
-		self.__layout.addRow(ThreshGroupBox)
+		# ThreshGroupBox = qt.QGroupBox()
+		# ThreshGroupBox.setTitle('3D Visualization Intensity Threshold')
+		# ThreshGroupBoxLayout = qt.QFormLayout(ThreshGroupBox)
+		# ThreshGroupBoxLayout.addRow(self.__threshRange)
+		# self.__layout.addRow(ThreshGroupBox)
 
 		editorWidgetParent = slicer.qMRMLWidget()
 		editorWidgetParent.setLayout(qt.QVBoxLayout())
@@ -77,7 +77,6 @@ class ReviewStep( ModelSegmentationStep ) :
 		self.__editorWidget = EditorWidget(parent=editorWidgetParent)
 		self.__editorWidget.setup()
 		self.__layout.addRow(editorWidgetParent)
-		self.hideUnwantedEditorUIElements()
 
 		RestartGroupBox = qt.QGroupBox()
 		RestartGroupBox.setTitle('Restart')
@@ -94,7 +93,7 @@ class ReviewStep( ModelSegmentationStep ) :
 		self.__RemoveNormalizedImages = qt.QCheckBox()
 		self.__RemoveNormalizedImages.checked = True
 		self.__RemoveNormalizedImages.setToolTip("Delete images produced via normalization.")
-		RestartGroupBoxLayout.addRow("Delete Normalized images: ", self.__RemoveCroppedSubtractionMap)   
+		RestartGroupBoxLayout.addRow("Delete Normalized images: ", self.__RemoveNormalizedImages)   
 
 		self.__RemoveSubtractionMap = qt.QCheckBox()
 		self.__RemoveSubtractionMap.checked = True
@@ -109,12 +108,12 @@ class ReviewStep( ModelSegmentationStep ) :
 		self.__RemoveROI = qt.QCheckBox()
 		self.__RemoveROI.checked = False
 		self.__RemoveROI.setToolTip("Delete the ROI resulting from thresholding your original ROI.")
-		RestartGroupBoxLayout.addRow("Delete Full ROI: ", self.__RemoveROIModel)    
+		RestartGroupBoxLayout.addRow("Delete Full ROI: ", self.__RemoveROI)    
 
 		self.__RemoveROIModel = qt.QCheckBox()
 		self.__RemoveROIModel.checked = False
 		self.__RemoveROIModel.setToolTip("Delete the ROI resulting from thresholding your original ROI.")
-		RestartGroupBoxLayout.addRow("Delete Thresholded ROI: ", self.__RemoveROI) 
+		RestartGroupBoxLayout.addRow("Delete Thresholded ROI: ", self.__RemoveROIModel) 
 
 		self.__RemoveMarkups = qt.QCheckBox()
 		self.__RemoveMarkups.checked = True
@@ -135,8 +134,14 @@ class ReviewStep( ModelSegmentationStep ) :
 			how to use the segmentations module.
 		"""
 
-		self.__editorWidget.volumes.hide()
-
+		self.__editorWidget.setMergeNode(self.__thresholdedLabelNode)
+		self.__editorWidget.volumes.collapsed = True
+		self.__editorWidget.editLabelMapsFrame.collapsed = False
+		try:
+			self.__editorWidget.segmentEditorLabel.hide()
+			self.__editorWidget.infoIconLabel.hide()
+		except:
+			pass
 		# Useful testing code
 		# for widgetName in slicer.util.findChildren(self.__editorWidget.editBoxFrame):
 		# for widgetName in slicer.util.findChildren(self.__editorWidget.helper):
@@ -146,8 +151,8 @@ class ReviewStep( ModelSegmentationStep ) :
 			# widgetName.hide()
 		# print slicer.util.findChildren('','EditColorFrame')
 
-		for widget in ['DrawEffectToolButton', 'RectangleEffectToolButton', 'IdentifyIslandsEffectToolButton', 'RemoveIslandsEffectToolButton', 'SaveIslandEffectToolButton', 'RowFrame2']:
-			slicer.util.findChildren(self.__editorWidget.editBoxFrame, widget)[0].hide()
+		# for widget in ['DrawEffectToolButton', 'RectangleEffectToolButton', 'IdentifyIslandsEffectToolButton', 'RemoveIslandsEffectToolButton', 'SaveIslandEffectToolButton', 'RowFrame2']:
+		# 	slicer.util.findChildren(self.__editorWidget.editBoxFrame, widget)[0].hide()
 
 	def Restart( self ):
 
@@ -173,10 +178,10 @@ class ReviewStep( ModelSegmentationStep ) :
 			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('croppedVolumeID')))
 
 		if self.__RemoveROI.checked:
-			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('croppedVolumeLabelID')))
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('nonThresholdedLabelID')))
 
 		if self.__RemoveROIModel.checked:
-			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('modelLabelID')))
+			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('thresholdedLabelID')))
 
 		if self.__RemoveMarkups.checked:
 			slicer.mrmlScene.RemoveNode(Helper.getNodeByID(pNode.GetParameter('clippingModelNodeID')))
@@ -198,9 +203,9 @@ class ReviewStep( ModelSegmentationStep ) :
 		pNode.SetParameter('outputList', '')	
 		pNode.SetParameter('modelList', '')	
 
-		pNode.SetParameter('modelLabelID', '')
+		pNode.SetParameter('thresholdedLabelID', '')
 		pNode.SetParameter('croppedVolumeID', '')
-		pNode.SetParameter('croppedVolumeLabelID', '')
+		pNode.SetParameter('nonThresholdedLabelID', '')
 
 		pNode.SetParameter('roiNodeID', '')
 		pNode.SetParameter('roiTransformID', '')
@@ -210,6 +215,8 @@ class ReviewStep( ModelSegmentationStep ) :
 		pNode.SetParameter('vrThreshRange', '')
 
 		Helper.SetLabelVolume('')
+
+		self.__editorWidget.exit()
 
 		if self.__RestartActivated:
 			self.workflow().goForward()
@@ -273,7 +280,7 @@ class ReviewStep( ModelSegmentationStep ) :
 		# self.__vrDisplayNode.VisibilityOn()
 
 		Helper.SetBgFgVolumes(self.__visualizedID,'')
-		Helper.SetLabelVolume(self.__roiSegmentationNode.GetID())
+		Helper.SetLabelVolume(self.__thresholdedLabelNode.GetID())
 
 		self.onThresholdChanged()
 
@@ -290,15 +297,13 @@ class ReviewStep( ModelSegmentationStep ) :
 		self.__baselineVolumeID = pNode.GetParameter('baselineVolumeID')
 		self.__followupVolumeID = pNode.GetParameter('followupVolumeID')
 		self.__subtractVolumeID = pNode.GetParameter('subtractVolumeID')
-		self.__roiNodeID = pNode.GetParameter('roiNodeID')
+		self.__croppedVolumeID = pNode.GetParameter('cropedVolumeID')
 		self.__baselineVolumeNode = Helper.getNodeByID(self.__baselineVolumeID)
 		self.__followupVolumeNode = Helper.getNodeByID(self.__followupVolumeID)
 		self.__subtractVolumeNode = Helper.getNodeByID(self.__subtractVolumeID)
 		self.__vrDisplayNodeID = pNode.GetParameter('vrDisplayNodeID') 
-		self.__roiSegmentationNode = Helper.getNodeByID(pNode.GetParameter('croppedVolumeSegmentationID'))
-		self.__roiVolumeNode = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
+		self.__thresholdedLabelNode = Helper.getNodeByID(pNode.GetParameter('thresholdedLabelID'))
 
-		self.__editorWidget.setMergeNode(self.__roiSegmentationNode)
 		self.__clippingModelNode.GetDisplayNode().VisibilityOn()
 
 		if self.__followupVolumeID == None or self.__followupVolumeID == '':
@@ -314,23 +319,26 @@ class ReviewStep( ModelSegmentationStep ) :
 			if self.__vrDisplayNodeID != '':
 				self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(self.__vrDisplayNodeID)
 
-		self.__visualizedNode.AddAndObserveDisplayNodeID(self.__vrDisplayNode.GetID())
-		Helper.InitVRDisplayNode(self.__vrDisplayNode, self.__visualizedID, self.__roiNodeID)
+		# Replace this, most likely.
+		# self.__visualizedNode.AddAndObserveDisplayNodeID(self.__vrDisplayNode.GetID())
+		# Helper.InitVRDisplayNode(self.__vrDisplayNode, self.__visualizedID, self.__croppedVolumeID)
 
-		self.__threshRange.minimum = vrRange[0]
-		self.__threshRange.maximum = vrRange[1]
+		# self.__threshRange.minimum = vrRange[0]
+		# self.__threshRange.maximum = vrRange[1]
 
-		if pNode.GetParameter('vrThreshRangeMin') == '' or pNode.GetParameter('vrThreshRangeMin') == None:
-			self.__threshRange.setValues(vrRange[1]/3, 2*vrRange[1]/3)
-		else:
-			self.__threshRange.setValues(int(pNode.GetParameter('vrThreshRangeMin')), int(pNode.GetParameter('vrThreshRangeMax')))
+		# if pNode.GetParameter('vrThreshRangeMin') == '' or pNode.GetParameter('vrThreshRangeMin') == None:
+		# 	self.__threshRange.setValues(vrRange[1]/3, 2*vrRange[1]/3)
+		# else:
+		# 	self.__threshRange.setValues(float(pNode.GetParameter('vrThreshRangeMin')), float(pNode.GetParameter('vrThreshRangeMax')))
 
-		self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
-		self.__vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
+		# self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
+		# self.__vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
 
-		self.__vrColorMap.RemoveAllPoints()
-		self.__vrColorMap.AddRGBPoint(vrRange[0], 0.8, 0.8, 0) 
-		self.__vrColorMap.AddRGBPoint(vrRange[1], 0.8, 0.8, 0) 
+		# self.__vrColorMap.RemoveAllPoints()
+		# self.__vrColorMap.AddRGBPoint(vrRange[0], 0.8, 0.8, 0) 
+		# self.__vrColorMap.AddRGBPoint(vrRange[1], 0.8, 0.8, 0) 
+
+		self.hideUnwantedEditorUIElements()
 
 	def onExit(self, goingTo, transitionType):   
 

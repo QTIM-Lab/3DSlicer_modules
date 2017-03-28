@@ -87,9 +87,12 @@ class ROIStep( ModelSegmentationStep ) :
 		# Why here, if not init?
 		self.__vrLogic = slicer.modules.volumerendering.logic()
 
+		self.__originalMarkupButton = slicer.util.findChildren(name='CreateAndPlaceToolButton')[0]
+		self.__persistentButton = slicer.util.findChildren(text='Persistent')[0]
+
 		self.__layout = self.__parent.createUserInterface()
 
-		step_label = qt.QLabel( """Create either a convex ROI or a box ROI around the area you wish to threshold. Only voxels inside these ROIs will be thresholded in the next step. Click to add points to the convex ROI, or click and drag existing points to move them. A curved ROI will be filled in around these points. Similarly, click and drag the points on the box ROI to change its location and size.""")
+		step_label = qt.QLabel( """Create either a 3D volumetric ROI around the area you wish to threshold. Only voxels inside these ROIs will be thresholded in the next step. Click to add points to the volumetric ROI, or click and drag existing points to move them. A curved ROI will be filled in around these points. Similarly, click and drag the points on the box ROI to change its location and size.""")
 		step_label.setWordWrap(True)
 		self.__primaryGroupBox = qt.QGroupBox()
 		self.__primaryGroupBox.setTitle('Information')
@@ -104,15 +107,16 @@ class ROIStep( ModelSegmentationStep ) :
 
 		self.__markupButton = qt.QToolButton()
 		self.__markupButton.icon = qt.QIcon(os.path.join(os.path.dirname(__file__), 'MarkupsMouseModePlace.png'))
+		self.__markupButton.setCheckable(1)
 		self.__markupButton.connect('clicked()', self.onMarkupClicked)
-		self.__roiToolbarGroupBoxLayout.addRow('Toolbar Test Row', self.__markupButton)
+		self.__roiToolbarGroupBoxLayout.addRow('Model Marker Placement Tool', self.__markupButton)
 
 		self.__layout.addRow(self.__roiToolbarGroupBox)
 
 		# I'm referring to the Delaunay Triangulation as a "Convex ROI"
 		# I don't think this is very clear; a better title would be good.
 		self.__convexGroupBox = qt.QGroupBox()
-		self.__convexGroupBox.setTitle('Convex ROI')
+		self.__convexGroupBox.setTitle('Volumetric ROI')
 		self.__convexGroupBoxLayout = qt.QFormLayout(self.__convexGroupBox)
 
 		""" There is an interesting entanglement between markups and models
@@ -197,11 +201,11 @@ class ROIStep( ModelSegmentationStep ) :
 		self.__threshRange.connect('valuesChanged(double,double)', self.onThresholdChanged)
 		qt.QTimer.singleShot(0, self.killButton)
 
-		ThreshGroupBox = qt.QGroupBox()
-		ThreshGroupBox.setTitle('3D Visualization Intensity Threshold')
-		ThreshGroupBoxLayout = qt.QFormLayout(ThreshGroupBox)
-		ThreshGroupBoxLayout.addRow(self.__threshRange)
-		self.__layout.addRow(ThreshGroupBox)
+		# ThreshGroupBox = qt.QGroupBox()
+		# ThreshGroupBox.setTitle('3D Visualization Intensity Threshold')
+		# ThreshGroupBoxLayout = qt.QFormLayout(ThreshGroupBox)
+		# ThreshGroupBoxLayout.addRow(self.__threshRange)
+		# self.__layout.addRow(ThreshGroupBox)
 
 		# In case we wanted to set specific parameters for Volume Clip...
 
@@ -215,13 +219,11 @@ class ROIStep( ModelSegmentationStep ) :
 
 	def onMarkupClicked(self):
 
-		markupButton = slicer.util.findChildren(name='CreateAndPlaceToolButton')[0]
-		persistentButton = slicer.util.findChildren(text='Persistent')[0]
-
-		markupButton.click()
-
-		if not persistentButton.checked:
-			persistentButton.trigger()
+		self.__originalMarkupButton.click()
+		if not self.__persistentButton.checked:
+			self.__persistentButton.trigger()
+		if self.__clippingModelSelector.currentNode() == None or self.__clippingModelSelector.currentNode() == '':
+			self.__clippingModelSelector.addNode()
 
 	def onClippingModelSelect(self, node):
 
@@ -312,6 +314,11 @@ class ROIStep( ModelSegmentationStep ) :
 		pNode = self.parameterNode()
 		Helper.SetLabelVolume(None)
 
+		if self.__markupList != None and self.__markupList != '':
+			for ROI in self.__markupList:
+				Helper.getNodeByID(ROI[1]).GetDisplayNode().VisibilityOn()
+				self.setAndObserveClippingMarkupNode(Helper.getNodeByID(ROI[1]))
+
 		# Unsure about this step... might be a hold-over.
 		if self.__roi != None:
 			self.__roi.SetDisplayVisibility(1)
@@ -342,17 +349,10 @@ class ROIStep( ModelSegmentationStep ) :
 		self.__subtractVolumeID = pNode.GetParameter('subtractVolumeID')
 		self.__vrDisplayNodeID = pNode.GetParameter('vrDisplayNodeID') 
 
-		if self.__vrDisplayNode == None:
-			if self.__vrDisplayNodeID != '':
-				self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(self.__vrDisplayNodeID)
-			else:
-				self.InitVRDisplayNode()
-				self.__vrDisplayNodeID = self.__vrDisplayNode.GetID()
-		else:
-			if self.__followupVolumeID == None or self.__followupVolumeID == '':
-				Helper.InitVRDisplayNode(self.__vrDisplayNode, self.__baselineVolumeID, '')	
-			else:
-				Helper.InitVRDisplayNode(self.__vrDisplayNode, self.__followupVolumeID, '')	
+		if self.__vrDisplayNodeID != None and self.__vrDisplayNodeID != '':
+			self.__vrDisplayNode = slicer.mrmlScene.GetNodeByID(self.__vrDisplayNodeID)
+
+		# self.InitVRDisplayNode()
 
 	def InitVRDisplayNode(self):
 
@@ -399,7 +399,7 @@ class ROIStep( ModelSegmentationStep ) :
 		if pNode.GetParameter('vrThreshRangeMin') == '' or pNode.GetParameter('vrThreshRangeMin') == None:
 			self.__threshRange.setValues(vrRange[1]/3, 2*vrRange[1]/3)
 		else:
-			self.__threshRange.setValues(int(pNode.GetParameter('vrThreshRangeMin')), int(pNode.GetParameter('vrThreshRangeMax')))
+			self.__threshRange.setValues(float(pNode.GetParameter('vrThreshRangeMin')), float(pNode.GetParameter('vrThreshRangeMax')))
 
 		self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
 
@@ -407,8 +407,11 @@ class ROIStep( ModelSegmentationStep ) :
 
 		pNode = self.parameterNode()
 
-		pNode.SetParameter('vrThreshRangeMin', str(self.__threshRange.minimum))
-		pNode.SetParameter('vrThresRangeMax', str(self.__threshRange.maximum))
+		# pNode.SetParameter('vrThreshRangeMin', str(self.__threshRange.minimum))
+		# pNode.SetParameter('vrThreshRangeMax', str(self.__threshRange.maximum))
+
+		if self.__markupButton.isChecked():
+			self.__markupButton.click()
 
 		if goingTo.id() == 'ThresholdStep':
 			
@@ -443,7 +446,7 @@ class ROIStep( ModelSegmentationStep ) :
 					# I don't think OutputList is currently useful. The better tool would be to merge several models.
 					self.__outputList.append(outputVolume.GetID())
 
-					outputVolume.SetName(baselineVolume.GetName() + '_roi_image')
+					outputVolume.SetName(baselineVolume.GetName() + '_roi_cropped')
 
 			pNode.SetParameter('outputList', '__'.join(self.__outputList))
 			pNode.SetParameter('modelList', '__'.join(self.__modelList))
@@ -452,20 +455,21 @@ class ROIStep( ModelSegmentationStep ) :
 
 			# Get starting threshold parameters.
 			roiRange = outputVolume.GetImageData().GetScalarRange()
-			thresholdParameter = str(0.5*(roiRange[0]+roiRange[1]))+','+str(roiRange[1])
 			pNode.SetParameter('intensityThreshRangeMin', str(roiRange[0]+1))
 			pNode.SetParameter('intensityThreshRangeMax', str(roiRange[1]))
 
 			# Create a label node for segmentation. Should one make a new one each time? Who knows
 			vl = slicer.modules.volumes.logic()
 
-			roiLabelID = pNode.GetParameter('croppedVolumeLabelID') 
-			if pNode.GetParameter('croppedVolumeLabelID') == '' or pNode.GetParameter('croppedVolumeLabelID') == None:
-				roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, outputVolume, baselineVolume.GetName() + '_roi_threshold')
-				pNode.SetParameter('croppedVolumeLabelID', roiSegmentation.GetID())
-			else:
-				roiSegmentation = Helper.getNodeByID(pNode.GetParameter('croppedVolumeLabelID'))
-			pNode.SetParameter('modelLabelID', roiSegmentation.GetID())
+			# Instantiate non-thresholded label.
+			if pNode.GetParameter('nonThresholdedLabelID') == '' or pNode.GetParameter('nonThresholdedLabelID') == None:
+				roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, outputVolume, baselineVolume.GetName() + '_roi_label')
+				pNode.SetParameter('nonThresholdedLabelID', roiSegmentation.GetID())
+
+			# Instantiate thresholded label.
+			if pNode.GetParameter('thresholdedLabelID') == '' or pNode.GetParameter('thresholdedLabelID') == None:
+				roiSegmentation = vl.CreateLabelVolume(slicer.mrmlScene, outputVolume, baselineVolume.GetName() + '_roi_label_thresholded')
+				pNode.SetParameter('thresholdedLabelID', roiSegmentation.GetID())
 
 			self.__clippingMarkupNode.RemoveObserver(self.__clippingMarkupNodeObserver)
 			self.__clippingMarkupNodeObserver = None

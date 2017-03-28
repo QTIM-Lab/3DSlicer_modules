@@ -34,7 +34,7 @@ class ThresholdStep( ModelSegmentationStep ) :
 		self.__vrOpacityMap = None
 		self.__vrColorMap = None
 
-		self.__roiLabelNode = None
+		self.__thresholdedLabelNode = None
 		self.__roiVolume = None
 		self.__visualizedVolume = None
 
@@ -60,6 +60,7 @@ class ThresholdStep( ModelSegmentationStep ) :
 		self.__thresholdGroupBoxLayout = qt.QFormLayout(self.__thresholdGroupBox)
 		threshLabel = qt.QLabel('Select Intensity Range:')
 		threshLabel.alignment = 4
+
 		self.__threshRange = slicer.qMRMLRangeWidget()
 		self.__threshRange.decimals = 0
 		self.__threshRange.singleStep = 1
@@ -94,7 +95,7 @@ class ThresholdStep( ModelSegmentationStep ) :
 			thresh.ReplaceInOn()
 			thresh.Update()
 
-			self.__roiLabelNode.SetAndObserveImageData(thresh.GetOutput())
+			self.__thresholdedLabelNode.SetAndObserveImageData(thresh.GetOutput())
 
 	def killButton(self):
 		# ctk creates a useless final page button. This method gets rid of it.
@@ -124,27 +125,20 @@ class ThresholdStep( ModelSegmentationStep ) :
 		self.__vrDisplayNode = Helper.getNodeByID(pNode.GetParameter('vrDisplayNodeID'))
 		self.updateWidgetFromParameters(pNode)
 
-		if self.__vrDisplayNode == None or self.__vrDisplayNode != '':
-			self.InitVRDisplayNode()
-
 		# Retrieves necessary nodes.
-		roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
-		self.__roiVolume = roiVolume
-		self.__roiLabelNode = Helper.getNodeByID(pNode.GetParameter('croppedVolumeLabelID'))
-		self.__modelSegmentationNode = Helper.getNodeByID(pNode.GetParameter('modelLabelID'))
+		self.__roiVolume = Helper.getNodeByID(pNode.GetParameter('croppedVolumeID'))
+		self.__thresholdedLabelNode = Helper.getNodeByID(pNode.GetParameter('thresholdedLabelID'))
+		self.__nonThresholdedLabelNode = Helper.getNodeByID(pNode.GetParameter('nonThresholdedLabelID'))
 
-		self.__roiNodeID = pNode.GetParameter('roiNodeID')
-		if self.__roiNodeID == None:
-			Helper.Error('Failed to find ROI node -- it should have been defined in the previous step!')
-			return
+		# self.InitVRDisplayNode()
 
 		# Not sure why this is here..
 		# self.__vrDisplayNode.VisibilityOn()
 
-		threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
-
 		# Adds segementation label volume.
-		Helper.SetLabelVolume(self.__roiLabelNode.GetID())
+		Helper.SetLabelVolume(self.__thresholdedLabelNode.GetID())
+
+		threshRange = [self.__threshRange.minimumValue, self.__threshRange.maximumValue]
 
 		# Segments the entire vtk model. I assume there's a more concise way
 		# to do it than thresholding over its entire intensity range...
@@ -161,7 +155,7 @@ class ThresholdStep( ModelSegmentationStep ) :
 		thresh.ReplaceOutOn()
 		thresh.ReplaceInOn()
 		thresh.Update()
-		self.__modelSegmentationNode.SetAndObserveImageData(thresh.GetOutput())
+		self.__nonThresholdedLabelNode.SetAndObserveImageData(thresh.GetOutput())
 
 		# Adjusts threshold information.
 		self.onThresholdChanged()
@@ -183,17 +177,17 @@ class ThresholdStep( ModelSegmentationStep ) :
 			self.__visualizedVolume = Helper.getNodeByID(pNode.GetParameter('subtractVolumeID'))
 
 		thresholdRange = [float(pNode.GetParameter('intensityThreshRangeMin')), float(pNode.GetParameter('intensityThreshRangeMax'))]
+
 		if thresholdRange != '':
-			self.__threshRange.minimumValue = float(thresholdRange[0])
-			self.__threshRange.maximumValue = float(thresholdRange[1])
+			self.__threshRange.maximum = thresholdRange[1]
+			self.__threshRange.minimum = thresholdRange[0]
+			self.__threshRange.maximumValue = thresholdRange[1]
+			self.__threshRange.minimumValue = thresholdRange[0]
 		else:
 			Helper.Error('Unexpected parameter values! Error code CT-S03-TNA. Please report')
 
-		labelID = pNode.GetParameter('croppedVolumeLabelID')
-		self.__roiLabelNode = Helper.getNodeByID(labelID)
-
-		self.__vrOpacityMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetScalarOpacity()
-		self.__vrColorMap = self.__vrDisplayNode.GetVolumePropertyNode().GetVolumeProperty().GetRGBTransferFunction()
+		labelID = pNode.GetParameter('thresholdedLabelID')
+		self.__thresholdedLabelNode = Helper.getNodeByID(labelID)
 
 	def onExit(self, goingTo, transitionType):   
 		pNode = self.parameterNode()
@@ -221,8 +215,10 @@ class ThresholdStep( ModelSegmentationStep ) :
 			# Documentation on UnRegister is scant so far.
 			self.__vrDisplayNode.UnRegister(self.__vrLogic) 
 
-			Helper.InitVRDisplayNode(self.__vrDisplayNode.GetID(), self.__visualizedVolume.GetID(), '')
-			self.__visualizedVolume.AddAndObserveDisplayNodeID(self.__vrDisplayNode.GetID())
+			Helper.InitVRDisplayNode(self.__vrDisplayNode, self.__roiVolume.GetID(), '')
+			self.__roiVolume.AddAndObserveDisplayNodeID(self.__vrDisplayNode.GetID())
+		else:
+			self.__vrDisplayNode.SetAndObserveVolumeNodeID(self.__roiVolume.GetID())
 
 		# This is a bit messy.
 		viewNode = slicer.util.getNode('vtkMRMLViewNode1')
