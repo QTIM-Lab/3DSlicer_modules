@@ -156,6 +156,8 @@ class ReviewStep( ModelSegmentationStep ) :
 
 	def Restart( self ):
 
+		self.__DefaultToolButton.click()
+
 		pNode = self.parameterNode()
 		print pNode
 
@@ -211,7 +213,8 @@ class ReviewStep( ModelSegmentationStep ) :
 		pNode.SetParameter('roiTransformID', '')
 
 		pNode.SetParameter('vrDisplayNodeID', '')
-		pNode.SetParameter('intensityThreshRange', '')
+		pNode.SetParameter('intensityThreshRangeMin', '')
+		pNode.SetParameter('intensityThreshRangeMax', '')
 		pNode.SetParameter('vrThreshRange', '')
 
 		Helper.SetLabelVolume('')
@@ -271,6 +274,7 @@ class ReviewStep( ModelSegmentationStep ) :
 		super(ReviewStep, self).onEntry(comingFrom, transitionType)
 
 		self.__RestartActivated = True
+		self.__DefaultToolButton = slicer.util.findChildren(name='DefaultToolToolButton')[0]
 
 		pNode = self.parameterNode()
 
@@ -341,6 +345,8 @@ class ReviewStep( ModelSegmentationStep ) :
 		self.hideUnwantedEditorUIElements()
 
 	def onExit(self, goingTo, transitionType):   
+
+		self.__DefaultToolButton.click()
 
 		# extra error checking, in case the user manages to click ReportROI button
 		super(ModelSegmentationStep, self).onExit(goingTo, transitionType) 

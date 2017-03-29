@@ -142,7 +142,7 @@ class ThresholdStep( ModelSegmentationStep ) :
 
 		# Segments the entire vtk model. I assume there's a more concise way
 		# to do it than thresholding over its entire intensity range...
-		range0 = 0
+		range0 = self.__threshRange.minimum
 		range1 = self.__threshRange.maximum
 		thresh = vtk.vtkImageThreshold()
 		if vtk.VTK_MAJOR_VERSION <= 5:
