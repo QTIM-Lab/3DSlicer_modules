@@ -178,6 +178,36 @@ class VolumeSelectStep(ModelSegmentationStep) :
 
 	def updateWidgetFromParameters(self, parameterNode):
 
+		pNode = self.parameterNode()
+
+		pNode.SetParameter('baselineVolumeID', '')	
+		pNode.SetParameter('followupVolumeID', '')
+		pNode.SetParameter('originalBaselineVolumeID', '')	
+		pNode.SetParameter('originalFollowupVolumeID', '')
+
+		pNode.SetParameter('registrationVolumeID', '')
+
+		pNode.SetParameter('baselineNormalizeVolumeID', '')
+		pNode.SetParameter('followupNormalizeVolumeID', '')
+		pNode.SetParameter('subtractVolumeID', '')
+
+		pNode.SetParameter('clippingMarkupNodeID', '')
+		pNode.SetParameter('clippingModelNodeID', '')
+		pNode.SetParameter('outputList', '')	
+		pNode.SetParameter('modelList', '')	
+
+		pNode.SetParameter('thresholdedLabelID', '')
+		pNode.SetParameter('croppedVolumeID', '')
+		pNode.SetParameter('nonThresholdedLabelID', '')
+
+		pNode.SetParameter('roiNodeID', '')
+		pNode.SetParameter('roiTransformID', '')
+
+		pNode.SetParameter('vrDisplayNodeID', '')
+		pNode.SetParameter('intensityThreshRangeMin', '')
+		pNode.SetParameter('intensityThreshRangeMax', '')
+		pNode.SetParameter('vrThreshRange', '')
+
 		# To save parameters from step to step.
 		baselineVolumeID = parameterNode.GetParameter('originalBaselineVolumeID')
 		followupVolumeID = parameterNode.GetParameter('originalFollowupVolumeID')

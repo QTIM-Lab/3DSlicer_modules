@@ -35,13 +35,13 @@ class ModelSegmentation:
 			Modifications to the parent result in modifications to the qt box that 
 			then prints the relevant information.
 		"""
-		parent.title = """ModelSegmentation"""
-		parent.categories = ["""Examples"""]
+		parent.title = """Model Segmentation"""
+		parent.categories = ["""Segmentation"""]
 		parent.contributors = ["""Andrew Beers"""]
 		parent.helpText = """
 		This module is meant to create easy and effecient segmentations on high slice
 		resolution medical images. It can calculate subtraction maps, register images,
-		normalize images, create automatic 3D ROIs using Delaunay Triangulation, and 
+		normalize images, create 3D volumetric ROIs using Delaunay Triangulation, and finally
 		threshold intensities within an ROI.
 		""";
 		parent.acknowledgementText = """Andrew Beers, QTIM [LINK] [OTHER ACKNOWLEDGEMENTS].
