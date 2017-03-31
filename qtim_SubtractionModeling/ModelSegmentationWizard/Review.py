@@ -74,8 +74,8 @@ class ReviewStep( ModelSegmentationStep ) :
 		editorWidgetParent = slicer.qMRMLWidget()
 		editorWidgetParent.setLayout(qt.QVBoxLayout())
 		editorWidgetParent.setMRMLScene(slicer.mrmlScene)
-		self.__editorWidget = EditorWidget(parent=editorWidgetParent)
-		self.__editorWidget.setup()
+		self.EditorWidget = EditorWidget(parent=editorWidgetParent)
+		self.EditorWidget.setup()
 		self.__layout.addRow(editorWidgetParent)
 
 		RestartGroupBox = qt.QGroupBox()
@@ -134,25 +134,25 @@ class ReviewStep( ModelSegmentationStep ) :
 			how to use the segmentations module.
 		"""
 
-		self.__editorWidget.setMergeNode(self.__thresholdedLabelNode)
-		self.__editorWidget.volumes.collapsed = True
-		self.__editorWidget.editLabelMapsFrame.collapsed = False
+		self.EditorWidget.setMergeNode(self.__thresholdedLabelNode)
+		self.EditorWidget.volumes.collapsed = True
+		self.EditorWidget.editLabelMapsFrame.collapsed = False
 		try:
-			self.__editorWidget.segmentEditorLabel.hide()
-			self.__editorWidget.infoIconLabel.hide()
+			self.EditorWidget.segmentEditorLabel.hide()
+			self.EditorWidget.infoIconLabel.hide()
 		except:
 			pass
 		# Useful testing code
-		# for widgetName in slicer.util.findChildren(self.__editorWidget.editBoxFrame):
-		# for widgetName in slicer.util.findChildren(self.__editorWidget.helper):
-			# widget = slicer.util.findChildren(self.__editorWidget.editBoxFrame)
+		# for widgetName in slicer.util.findChildren(self.EditorWidget.editBoxFrame):
+		# for widgetName in slicer.util.findChildren(self.EditorWidget.helper):
+			# widget = slicer.util.findChildren(self.EditorWidget.editBoxFrame)
 			# print widgetName.objectName
 			# print widgetName.parent.name
 			# widgetName.hide()
 		# print slicer.util.findChildren('','EditColorFrame')
 
 		# for widget in ['DrawEffectToolButton', 'RectangleEffectToolButton', 'IdentifyIslandsEffectToolButton', 'RemoveIslandsEffectToolButton', 'SaveIslandEffectToolButton', 'RowFrame2']:
-		# 	slicer.util.findChildren(self.__editorWidget.editBoxFrame, widget)[0].hide()
+		# 	slicer.util.findChildren(self.EditorWidget.editBoxFrame, widget)[0].hide()
 
 	def Restart( self ):
 
@@ -219,7 +219,7 @@ class ReviewStep( ModelSegmentationStep ) :
 
 		Helper.SetLabelVolume('')
 
-		self.__editorWidget.exit()
+		self.EditorWidget.exit()
 
 		if self.__RestartActivated:
 			self.workflow().goForward()

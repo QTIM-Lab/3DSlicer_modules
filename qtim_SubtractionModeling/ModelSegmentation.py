@@ -35,7 +35,7 @@ class ModelSegmentation:
 			Modifications to the parent result in modifications to the qt box that 
 			then prints the relevant information.
 		"""
-		parent.title = """Model Segmentation"""
+		parent.title = """Volumetric Segmentation"""
 		parent.categories = ["""Segmentation"""]
 		parent.contributors = ["""Andrew Beers"""]
 		parent.helpText = """
